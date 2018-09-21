@@ -1,0 +1,102 @@
+#!/usr/bin/env python3
+#vim: set filetype=python
+
+import sys
+#from sys import argv
+import socket
+import argparse
+
+
+############################################
+# Auxiliary functions
+
+def initialParams():
+    "Sets up the initial Central Server ip and port"
+    parser = argparse.ArgumentParser(sys.argv[1:])
+    #parser = argparse.ArgumentParser(argv[1:])
+    parser.add_argument('-n', help='Central Server name', default='localhost')
+    parser.add_argument('-p', help='Central Server port', default='58004')
+    args = parser.parse_args()
+    return args
+
+def readCommand():
+    #there is no switch in python...
+    exit()
+
+def executeCommand(com):
+    "Execute the command based on the @com supplied as input"
+    pass
+
+def makeProtocolString(command, args):
+    return command + args + '\0' #FIXME
+
+def printDirContent():
+    pass
+
+def getDirContent(dir):
+    pass
+
+def listAvailableCommands():
+    "Lists the available commands to the user in Standard Output"
+    #note if no user is logged in only show login
+    #else show all except login
+    pass
+
+############################################
+# User API
+
+def login(user, password):
+    "Login with user and pass"
+    pass
+
+def deluser():
+    "Deletes this user from the server"
+    pass
+
+def backup(dir):
+    "Performs a backup of directory dir"
+    pass
+
+def restore(dir):
+    "Restores the directory dir"
+    pass
+
+def dirlist():
+    "Lists all the directories"
+    pass
+
+def filelist(dir):
+    "Lists all the files in the directory dir"
+    pass
+
+def deletedir(dir):
+    "Deletes directory dir"
+    pass
+
+def logout():
+    "Logs out the current logged user"
+    #maybe have a variable with the current user since we need to perform
+    #a login with EVERY COMMAND
+    pass
+
+def exit():
+    "Exits the application"
+    #Perform any clean up necessary
+    global keepGoing
+    keepGoing = False
+
+# Entry Point
+keepGoing = True
+
+def main():
+    u = initialParams() #access u.n and u.p
+    #we can't use u.n directly, we need to use socket.gethostbyname()
+    #variable for TCP socket
+
+    #global keepGoing #not sure if needed here
+    while keepGoing:
+        readCommand()
+
+
+if __name__ == "__main__":
+    main()
