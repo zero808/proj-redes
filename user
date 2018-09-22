@@ -2,30 +2,39 @@
 #vim: set filetype=python
 
 import sys
-#from sys import argv
 import socket
 import argparse
 
-
-############################################
 # Auxiliary functions
 
 def initialParams():
     "Sets up the initial Central Server ip and port"
     parser = argparse.ArgumentParser(sys.argv[1:])
-    #parser = argparse.ArgumentParser(argv[1:])
     parser.add_argument('-n', help='Central Server name', default='localhost')
     parser.add_argument('-p', help='Central Server port', default='58004')
     args = parser.parse_args()
     return args
 
 def readCommand():
-    #there is no switch in python...
-    exit()
+    try:
+        listAvailableCommands()
+        command = input("$ ")
+        tokens = command.split()
+        if len(tokens) > 0 and isValidCommand(tokens[0]):
+            #pass every token
+            executeCommand(tokens)
 
-def executeCommand(com):
-    "Execute the command based on the @com supplied as input"
-    pass
+    except EOFError:
+        pass
+
+def isValidCommand(command = ""):
+    return command in valid.keys()
+
+def executeCommand(command):
+    """Execute the command based on the command supplied as input and pass
+    the remaining arguments.
+    Each command decides how to manage the several tokens"""
+    valid.get(command[0])(command)
 
 def makeProtocolString(command, args):
     return command + args + '\0' #FIXME
@@ -36,60 +45,131 @@ def printDirContent():
 def getDirContent(dir):
     pass
 
+def isLoggedIn():
+    return user != "" and password != ""
+
 def listAvailableCommands():
     "Lists the available commands to the user in Standard Output"
-    #note if no user is logged in only show login
-    #else show all except login
-    pass
+    print("Available Commands:")
+    if isLoggedIn():
+        print("deluser",
+                "backup dir",
+                "restore dir",
+                "dirlist",
+                "filelist dir",
+                "delete dir",
+                "logout",
+                sep="\n")
+    else:
+        print("login user pass")
+    print("exit")
+
+# *variable, **keyword -> é um mapa
+#def call(*args, **keyword):
+def call(message):
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.connect((sockIP, sockPort))
+        s.send(str.encode(message))
+        #needs to have some checks to confirm we read the whole thing
+        #make a loop
+        data = s.recv(1024)
+#        print("Recebi: ", data)
 
 ############################################
 # User API
 
-def login(user, password):
+def login(args):
     "Login with user and pass"
-    pass
+    #user, password
+    if not isLoggedIn() and len(args) == 3:
+        global user
+        user = args[1]
+        global password
+        password = args[2]
 
-def deluser():
+    #perform service call
+    status = call("AUT", user, password)
+    if status == "OK":
+        pass
+    elif status == "NOK":
+        #clean up
+        logout(None)
+    elif status == "NEW":
+        pass
+    print("oi")
+
+def deluser(args):
     "Deletes this user from the server"
     pass
 
-def backup(dir):
+def backup(args):
     "Performs a backup of directory dir"
     pass
 
-def restore(dir):
+def restore(args):
     "Restores the directory dir"
     pass
 
-def dirlist():
+def dirlist(args):
     "Lists all the directories"
     pass
 
-def filelist(dir):
+def filelist(args):
     "Lists all the files in the directory dir"
     pass
 
-def deletedir(dir):
+def delete(args):
     "Deletes directory dir"
     pass
 
-def logout():
+def logout(args):
     "Logs out the current logged user"
     #maybe have a variable with the current user since we need to perform
     #a login with EVERY COMMAND
-    pass
+    global user
+    user = ""
+    global password
+    password = ""
 
-def exit():
+def exit(args):
     "Exits the application"
     #Perform any clean up necessary
     global keepGoing
     keepGoing = False
+    print("exit")
+
+
+############################################
+# Global variables
+###########################################
+# valid commands and their respective implementation
+valid = { "login": login,
+        "deluser": deluser,
+        "backup": backup,
+        "restore": restore,
+        "dirlist": dirlist,
+        "filelist": filelist,
+        "delete": delete,
+        "logout": logout,
+        "exit": exit }
 
 # Entry Point
 keepGoing = True
 
+# User and password
+user = ""
+password = ""
+
+# Central Server location
+sockIP = ""
+sockPort = ""
+############################################
 def main():
     u = initialParams() #access u.n and u.p
+    global sockIP, sockPort
+    sockIP = socket.gethostbyname(u.n)
+    sockPort = int(u.p)
+
     #we can't use u.n directly, we need to use socket.gethostbyname()
     #variable for TCP socket
 
