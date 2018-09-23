@@ -36,8 +36,9 @@ def executeCommand(command):
     Each command decides how to manage the several tokens"""
     valid.get(command[0])(command)
 
-def makeProtocolString(command, args):
-    return command + args + '\0' #FIXME
+def makeProtocolString(*command):
+    ret = command + ('\n',)
+    return ' '.join(ret)
 
 def printDirContent():
     pass
@@ -66,7 +67,7 @@ def listAvailableCommands():
 
 # *variable, **keyword -> é um mapa
 #def call(*args, **keyword):
-def call(message):
+def call(server, message ):
     buffer_size = 4096
     chunks = []
     bytes_rec = 0
@@ -74,37 +75,31 @@ def call(message):
 
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.connect((sockIP, sockPort))
-            try:
-                #Send our request (after converting it to bytes)
-                s.sendall(str.encode(message))
-                #s.send(str.encode(message))
+            s.connect(server)
+            #Send our request (after converting it to bytes)
 
-                #keep reading the response
-                while bytes_rec < buffer_size:
-                    data = s.recv(10)
-                    #the server closed the connection, i.e., there is
-                    #no more data to be received
-                    if data == b'':
-                        break
-                    #print(data.decode())
+            s.sendall(str.encode(message))
 
-                    chunks.append(data)
-                    bytes_rec = bytes_rec + len(data)
-                    # we got the final '\n' so this was the last message
-                    if data.endswith(b'\n'):
-                        break
+            #keep reading the response
+            while bytes_rec < buffer_size:
+                data = s.recv(10)
+                #the server closed the connection, i.e., there is
+                #no more data to be received
+                if data == b'':
+                    break
+                #print(data.decode())
 
-                ret = b''.join(map(bytes, chunks))
+                chunks.append(data)
+                bytes_rec = bytes_rec + len(data)
+                # we got the final '\n' so this was the last message
+                if data.endswith(b'\n'):
+                    break
 
-            except InterruptedError:
-                print("Error in request:\n", message)
+            ret = b''.join(chunks)
+
     except ConnectionRefusedError:
         print("Error in connecting to socket on port: ", sockPort)
 
-    #ret = ''.join(map(bytes.decode, chunks))
-    #don't decode the message as we might need to pass
-    #data we received from the CS to the BS
     print(ret)
     return ret
 
@@ -121,8 +116,8 @@ def login(args):
         password = args[2]
 
     #perform service call
-    message = " ".join(map(str, ["AUT", user, password]))
-    status = call(message)
+    message = makeProtocolString("AUT", user, password)
+    status = call(CS, message)
     if status == "OK":
         pass
     elif status == "NOK":
@@ -194,14 +189,15 @@ user = ""
 password = ""
 
 # Central Server location
-sockIP = ""
-sockPort = ""
+CS = ()
+# Backup Server location
+#BS = ()
 ############################################
+
 def main():
     u = initialParams() #access u.n and u.p
-    global sockIP, sockPort
-    sockIP = socket.gethostbyname(u.n)
-    sockPort = int(u.p)
+    global CS
+    CS = (socket.gethostbyname(u.n), int(u.p))
 
     while keepGoing:
         readCommand()
