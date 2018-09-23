@@ -65,43 +65,38 @@ def listAvailableCommands():
         print("login user pass")
     print("exit")
 
-# *variable, **keyword -> é um mapa
-#def call(*args, **keyword):
-def call(server, message ):
+def call(socket, message ):
     buffer_size = 4096
     chunks = []
     bytes_rec = 0
-    ret = "NOK"
+    ret = NOK
 
-    try:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.connect(server)
-            #Send our request (after converting it to bytes)
+    #Send our request (after converting it to bytes)
+    socket.sendall(str.encode(message))
 
-            s.sendall(str.encode(message))
+    #keep reading the response
+    while bytes_rec < buffer_size:
+        data = socket.recv(buffer_size)
+        #the server closed the connection, i.e., there is
+        #no more data to be received
+        if data == b'':
+            break
+        #print(data.decode())
 
-            #keep reading the response
-            while bytes_rec < buffer_size:
-                data = s.recv(buffer_size)
-                #the server closed the connection, i.e., there is
-                #no more data to be received
-                if data == b'':
-                    break
-                #print(data.decode())
+        chunks.append(data)
+        bytes_rec = bytes_rec + len(data)
+        # we got the final '\n' so this was the last message
+        if data.endswith(b'\n'):
+            break
 
-                chunks.append(data)
-                bytes_rec = bytes_rec + len(data)
-                # we got the final '\n' so this was the last message
-                if data.endswith(b'\n'):
-                    break
-
-            ret = b''.join(chunks)
-
-    except ConnectionRefusedError:
-        print("Error in connecting to socket on port: ", sockPort)
+    ret = b''.join(chunks)
 
     print(ret)
     return ret
+
+def loginAux(socket):
+    message = makeProtocolString("AUT", user, password)
+    return call(socket, message)
 
 ############################################
 # User API
@@ -115,22 +110,37 @@ def login(args):
         global password
         password = args[2]
 
-    #perform service call
-    message = makeProtocolString("AUT", user, password)
-    status = call(CS, message)
-    if status == "OK":
-        pass
-    elif status == "NOK":
-        #clean up
-        logout(None)
-    elif status == "NEW":
-        pass
-
-    return status
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.connect(CS)
+            #perform service call
+            status = loginAux(s)
+            if status == OK:
+                pass
+            elif status == NOK:
+                #clean up
+                logout(None)
+            elif status == NEW:
+                pass
+            return status
+    except ConnectionRefusedError:
+        print("Error in connecting to socket on port: ", sockPort)
 
 def deluser(args):
     "Deletes this user from the server"
-    pass
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.connect(CS)
+            if loginAux(s) == OK:
+                ret = call(s, makeProtocolString("DLU"))
+                if ret == OK:
+                    logout(None)
+                elif ret == NOK:
+                    print("Error: Could not delete the current user")
+            else:
+                print("Error: Could not delete the current user")
+    except ConnectionRefusedError:
+        print("Error in connecting to socket on port: ", sockPort)
 
 def backup(args):
     "Performs a backup of directory dir"
@@ -172,6 +182,11 @@ def exit(args):
 ############################################
 # Global variables
 ###########################################
+#Return codes
+OK = "OK"
+NOK = "NOK"
+NEW = "NEW"
+
 # valid commands and their respective implementation
 valid = { "login": login,
         "deluser": deluser,
