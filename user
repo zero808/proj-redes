@@ -82,7 +82,7 @@ def call(server, message ):
 
             #keep reading the response
             while bytes_rec < buffer_size:
-                data = s.recv(10)
+                data = s.recv(buffer_size)
                 #the server closed the connection, i.e., there is
                 #no more data to be received
                 if data == b'':
