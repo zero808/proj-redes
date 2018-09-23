@@ -126,6 +126,8 @@ def login(args):
     elif status == "NEW":
         pass
 
+    return status
+
 def deluser(args):
     "Deletes this user from the server"
     pass
