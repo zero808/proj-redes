@@ -50,7 +50,7 @@ def isLoggedIn():
 
 def listAvailableCommands():
     "Lists the available commands to the user in Standard Output"
-    print("Available Commands:")
+    print("", "Available Commands:", sep="\n")
     if isLoggedIn():
         print("deluser",
                 "backup dir",
@@ -67,13 +67,41 @@ def listAvailableCommands():
 # *variable, **keyword -> é um mapa
 #def call(*args, **keyword):
 def call(message):
+    buffer_size = 4096
+    chunks = []
+    bytes_rec = 0
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.connect((sockIP, sockPort))
-        s.send(str.encode(message))
-        #needs to have some checks to confirm we read the whole thing
-        #make a loop
-        data = s.recv(1024)
-#        print("Recebi: ", data)
+        try:
+            #Send our request (after converting it to bytes)
+            s.sendall(str.encode(message))
+            #s.send(str.encode(message))
+
+            #keep reading the response
+            while bytes_rec < buffer_size:
+                data = s.recv(10)
+                #the server closed the connection, i.e., there is
+                #no more data to be received
+                if data == b'':
+                    break
+                #print(data.decode())
+
+                chunks.append(data)
+                bytes_rec = bytes_rec + len(data)
+                # we got the final '\n' so this was the last message
+                if data.endswith(b'\n'):
+                    break
+
+        except InterruptedError:
+            print("Error in request:\n", message)
+            return ""
+
+    #ret = ''.join(map(bytes.decode, chunks))
+    #don't decode the message as we might need to pass
+    #data we received from the CS to the BS
+    ret = b''.join(map(bytes, chunks))
+    print(ret)
+    return ret
 
 ############################################
 # User API
@@ -88,7 +116,8 @@ def login(args):
         password = args[2]
 
     #perform service call
-    status = call("AUT", user, password)
+    message = " ".join(map(str, ["AUT", user, password]))
+    status = call(message)
     if status == "OK":
         pass
     elif status == "NOK":
@@ -96,7 +125,6 @@ def login(args):
         logout(None)
     elif status == "NEW":
         pass
-    print("oi")
 
 def deluser(args):
     "Deletes this user from the server"
@@ -170,10 +198,6 @@ def main():
     sockIP = socket.gethostbyname(u.n)
     sockPort = int(u.p)
 
-    #we can't use u.n directly, we need to use socket.gethostbyname()
-    #variable for TCP socket
-
-    #global keepGoing #not sure if needed here
     while keepGoing:
         readCommand()
 
