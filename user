@@ -37,8 +37,8 @@ def executeCommand(command):
     valid.get(command[0])(command)
 
 def makeProtocolString(*command):
-    ret = command + ('\n',)
-    return ' '.join(ret)
+    ret =  ' '.join(command)
+    return ret + '\n'
 
 def printDirContent():
     pass
@@ -124,7 +124,7 @@ def login(args):
                 pass
             return status
     except ConnectionRefusedError:
-        print("Error in connecting to socket on port: ", sockPort)
+        print("Error in connecting to socket on port: ", CS[1])
 
 def deluser(args):
     "Deletes this user from the server"
@@ -140,7 +140,7 @@ def deluser(args):
             else:
                 print("Error: Could not delete the current user")
     except ConnectionRefusedError:
-        print("Error in connecting to socket on port: ", sockPort)
+        print("Error in connecting to socket on port: ", CS[1])
 
 def backup(args):
     "Performs a backup of directory dir"
