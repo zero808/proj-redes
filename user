@@ -40,7 +40,7 @@ def makeProtocolString(*command):
     ret =  ' '.join(command)
     return ret + '\n'
 
-def printDirContent():
+def printDirContent(arg, dirname):
     pass
 
 def getDirContent(dir):
