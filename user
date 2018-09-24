@@ -63,6 +63,20 @@ def handleDirlist(arg):
 def getDirContent(dir):
     pass
 
+def validateUser(user):
+    return len(user) == 5 and user.isdigit()
+
+def validatePassword(password):
+    return len(password) == 8 and password.isalnum()
+
+def setCredentials(args):
+    u = args[0]
+    p = args[1]
+    if validateUser(u) and validatePassword(p):
+        global user, password
+        user = u
+        password = p
+
 def isLoggedIn():
     return user != "" and password != ""
 
