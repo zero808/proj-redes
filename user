@@ -3,11 +3,11 @@
 
 import sys
 import socket
-import argparse
 
 # Auxiliary functions
 
 def initialParams():
+    import argparse
     "Sets up the initial Central Server ip and port"
     parser = argparse.ArgumentParser(sys.argv[1:])
     parser.add_argument('-n', help='Central Server name', default='localhost')
@@ -19,7 +19,7 @@ def readCommand():
     try:
         listAvailableCommands()
         command = input("$ ")
-        tokens = command.split()
+        tokens = command.split(' ')
         if len(tokens) > 0 and isValidCommand(tokens[0]):
             #pass every token
             executeCommand(tokens)
@@ -89,7 +89,7 @@ def call(socket, message ):
         if data.endswith(b'\n'):
             break
 
-    ret = b''.join(chunks)
+    ret = b''.join(chunks).strip()
 
     print(ret)
     return ret
