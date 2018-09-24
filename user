@@ -43,6 +43,23 @@ def makeProtocolString(*command):
 def printDirContent(arg, dirname):
     pass
 
+def handleDirlist(arg):
+    print('----\n')
+    print(arg)
+    print('----\n')
+    tokens = arg.decode('utf8').split(' ')
+    if len(tokens) >= 2:
+        amount = int(tokens[1])
+    else:
+        amount = 0
+    if tokens[0] == 'LDR' and amount > 0:
+#        if amount == len(tokens[2:]:
+        print('List of directories:')
+        for directory in tokens[2:]:
+            print('\t- {}'.format(directory))
+    else:
+        printf('No directories to display')
+
 def getDirContent(dir):
     pass
 
@@ -103,25 +120,25 @@ def loginAux(socket):
 
 def login(args):
     "Login with user and pass"
-    #user, password
     if not isLoggedIn() and len(args) == 3:
-        global user
-        user = args[1]
-        global password
-        password = args[2]
+        setCredentials(args[1:])
 
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect(CS)
             #perform service call
             status = loginAux(s)
-            if status == OK:
+
+            if status == b"AUR OK":
                 pass
-            elif status == NOK:
+            elif status == b"AUR NOK":
                 #clean up
                 logout(None)
-            elif status == NEW:
+            elif status == b"AUR NEW":
                 pass
+            elif b"ERR" in status:
+                logout(None)
+                print("Malformed request")
             return status
     except ConnectionRefusedError:
         print("Error in connecting to socket on port: ", CS[1])
@@ -131,12 +148,14 @@ def deluser(args):
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect(CS)
-            if loginAux(s) == OK:
+            if loginAux(s) == b"AUR OK":
                 ret = call(s, makeProtocolString("DLU"))
-                if ret == OK:
+                if ret == b"DLR OK":
                     logout(None)
-                elif ret == NOK:
+                elif ret == b"DLR NOK":
                     print("Error: Could not delete the current user")
+                elif b"ERR" in ret:
+                    print("Malformed request")
             else:
                 print("Error: Could not delete the current user")
     except ConnectionRefusedError:
@@ -152,7 +171,19 @@ def restore(args):
 
 def dirlist(args):
     "Lists all the directories"
-    pass
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.connect(CS)
+            if loginAux(s) == b"AUR OK":
+                ret = call(s, makeProtocolString("LSD"))
+                if b"ERR" in ret:
+                    print("Malformed request")
+                else:
+                   handleDirlist(ret)
+            else:
+                print("Error: wrong credentials")
+    except ConnectionRefusedError:
+        print("Error in connecting to socket on port: ", CS[1])
 
 def filelist(args):
     "Lists all the files in the directory dir"
