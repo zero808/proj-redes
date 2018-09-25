@@ -103,17 +103,18 @@ def listAvailableCommands():
     "Lists the available commands to the user in Standard Output"
     print("", "Available Commands:", sep="\n")
     if isLoggedIn():
-        print("deluser",
+        print("\t",
+                "deluser",
                 "backup dir",
                 "restore dir",
                 "dirlist",
                 "filelist dir",
                 "delete dir",
                 "logout",
-                sep="\n")
+                sep="\n\t")
     else:
-        print("login user pass")
-    print("exit")
+        print("\tlogin user pass")
+    print("\texit")
 
 def call(socket, message ):
     buffer_size = 4096
