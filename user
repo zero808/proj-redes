@@ -92,6 +92,9 @@ def setCredentials(args):
         global user, password
         user = u
         password = p
+        return True
+    else:
+        return False
 
 def isLoggedIn():
     return user != "" and password != ""
@@ -151,7 +154,11 @@ def loginAux(socket):
 def login(args):
     "Login with user and pass"
     if not isLoggedIn() and len(args) == 3:
-        setCredentials(args[1:])
+        success = setCredentials(args[1:])
+        if not success:
+            print("""The username must be a 5 digits number and the password must be composed
+            of 8 alphanumeric characters""")
+            return
 
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
