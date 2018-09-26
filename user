@@ -119,23 +119,19 @@ def listAvailableCommands():
 def call(socket, message ):
     buffer_size = 4096
     chunks = []
-    bytes_rec = 0
     ret = NOK
 
     #Send our request (after converting it to bytes)
     socket.sendall(str.encode(message))
 
-    #keep reading the response
-    while bytes_rec < buffer_size:
+    while True:
         data = socket.recv(buffer_size)
         #the server closed the connection, i.e., there is
         #no more data to be received
         if data == b'':
             break
-        #print(data.decode())
-
         chunks.append(data)
-        bytes_rec = bytes_rec + len(data)
+
         # we got the final '\n' so this was the last message
         if data.endswith(b'\n'):
             break
@@ -167,14 +163,14 @@ def login(args):
             #perform service call
             status = loginAux(s)
 
-            if status == b"AUR OK":
+            if status == LOGIN_SUCCESS:
                 pass
-            elif status == b"AUR NOK":
+            elif status == LOGIN_FAIL:
                 #clean up
                 logout(None)
             elif status == b"AUR NEW":
                 pass
-            elif b"ERR" in status:
+            elif ERROR in status:
                 logout(None)
                 print("Malformed request")
             return status
@@ -186,7 +182,7 @@ def deluser(args):
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect(CS)
-            if loginAux(s) == b"AUR OK":
+            if loginAux(s) == LOGIN_SUCCESS:
                 ret = call(s, makeProtocolString("DLU"))
                 if ret == b"DLR OK":
                     logout(None)
@@ -212,7 +208,7 @@ def dirlist(args):
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect(CS)
-            if loginAux(s) == b"AUR OK":
+            if loginAux(s) == LOGIN_SUCCESS:
                 ret = call(s, makeProtocolString("LSD"))
                 if b"ERR" in ret:
                     print("Malformed request")
@@ -233,7 +229,7 @@ def filelist(args):
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect(CS)
-            if loginAux(s) == b"AUR OK":
+            if loginAux(s) == LOGIN_SUCCESS:
                 ret = call(s, makeProtocolString("LSF", dire))
                 if b"ERR" in ret:
                     print("Malformed request")
@@ -271,7 +267,9 @@ def exit(args):
 # Global variables
 ###########################################
 #Return codes
-OK = "OK"
+LOGIN_SUCCESS = b'AUR OK'
+LOGIN_FAIL = b'AUR NOK'
+ERROR = b'ERR'
 NOK = "NOK"
 NEW = "NEW"
 
