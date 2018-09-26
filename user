@@ -188,7 +188,7 @@ def deluser(args):
                     logout(None)
                 elif ret == b"DLR NOK":
                     print("Error: Could not delete the current user")
-                elif b"ERR" in ret:
+                elif ERROR in ret:
                     print("Malformed request")
             else:
                 print("Error: Could not delete the current user")
@@ -210,7 +210,7 @@ def dirlist(args):
             s.connect(CS)
             if loginAux(s) == LOGIN_SUCCESS:
                 ret = call(s, makeProtocolString("LSD"))
-                if b"ERR" in ret:
+                if ERROR in ret:
                     print("Malformed request")
                 else:
                    handleDirlist(ret)
@@ -231,7 +231,7 @@ def filelist(args):
             s.connect(CS)
             if loginAux(s) == LOGIN_SUCCESS:
                 ret = call(s, makeProtocolString("LSF", dire))
-                if b"ERR" in ret:
+                if ERROR in ret:
                     print("Malformed request")
                 elif ret == b'LFD NOK':
                     print("Filelist request cannot be served")
