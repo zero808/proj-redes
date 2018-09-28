@@ -11,19 +11,33 @@ import AuxiliaryFunctions
 bsName = socket.gethostbyname(socket.gethostname())
 bsUDPPort = 9997
 
-REG = 'REG'
-RGR = 'RGR'
-
-
 # Main Functions
+
+# Handles the deregistry of the BS
+def deregister():
+    # writes the request message
+    fullRequest = AuxiliaryFunctions.encode('UNR' + ' ' + bsName + ' ' + str(bsTCPPort) + '\n')
+    server.sendMessage(csName, fullRequest, csPort)
+
+    # message, address = server.receiveMessage()
+    message, address = server.receiveMessage()
+    confirmation = AuxiliaryFunctions.decode(message).split()
+    
+    if confirmation[0] == 'UAR':
+        if confirmation[1] == 'OK':
+            print('deregistry successfull')
+        elif confirmation[1] == 'NOK':
+            print('deregistry not successfull')
+        else:
+            print('syntax error')
 
 # Handles the registry of the new BS 
 def register():
     # writes the request message
-    fullRequest = AuxiliaryFunctions.encode(REG + ' ' + bsName + ' ' + str(bsTCPPort) + '\n')
+    fullRequest = AuxiliaryFunctions.encode('REG' + ' ' + bsName + ' ' + str(bsTCPPort) + '\n')
     server.sendMessage(csName, fullRequest, csPort)
 
-    #confirmation from CS
+    # confirmation from CS
     message, address = server.receiveMessage()
     confirmation = AuxiliaryFunctions.decode(message).split()
     
@@ -50,7 +64,6 @@ def getArguments(argv):
     csName = d['n']
     csPort = d['p']
 
-    # print(bsPort, csName, csPort)
     return (int(bsTCPPort), csName, int(csPort))
 
 def main(argv):
@@ -60,9 +73,9 @@ def main(argv):
     global csPort
 
     bsTCPPort, csName, csPort = getArguments(argv)
-    #print(bsPort, csName, csPort)
     server = UDPserver.UDPServer(bsName, bsUDPPort)
     register()
+    deregister()
 
 if __name__ == "__main__":
     main(sys.argv[1:])

@@ -18,10 +18,7 @@ class UDPServer:
     # request[1] is the client socket
 
     def receiveMessage(self):
-        print('server is waiting for message')
         data, clientAddress = self.sock.recvfrom(BUFFER_SIZE)
-        # print('Connected by ', clientAddress)
-        # print('Received:', str(data, "utf-8"))
         return (data, clientAddress)
 
     def sendMessage(self, clientAddress, message, clientPort):
@@ -33,7 +30,7 @@ class UDPServer:
 
 
 # Global Variables
-#
+
 #HOST = 'localhost'
 #PORT = 9999
 #BUFFER_SIZE = 4096
@@ -42,5 +39,6 @@ class UDPServer:
 #    server = UDPServer(HOST, PORT)
 #    data, clientAddress = server.receiveMessage()
 #    print(data)
-#    server.sendMessage(clientAddress[0], AuxiliaryFunctions.encode('RGR ERR'), clientAddress[1])
+#    server.sendMessage(clientAddress[0], AuxiliaryFunctions.encode('RGR OK'), clientAddress[1])
+#    server.sendMessage(clientAddress[0], AuxiliaryFunctions.encode('UAR OK'), clientAddress[1])
 #    server.closeConnection()
