@@ -31,14 +31,14 @@ class UDPServer:
 
 # Global Variables
 
-#HOST = 'localhost'
-#PORT = 9999
-#BUFFER_SIZE = 4096
+HOST = 'localhost'
+PORT = 9999
+BUFFER_SIZE = 4096
 
-#if __name__ == "__main__":
-#    server = UDPServer(HOST, PORT)
-#    data, clientAddress = server.receiveMessage()
-#    print(data)
-#    server.sendMessage(clientAddress[0], AuxiliaryFunctions.encode('RGR OK'), clientAddress[1])
-#    server.sendMessage(clientAddress[0], AuxiliaryFunctions.encode('UAR OK'), clientAddress[1])
-#    server.closeConnection()
+if __name__ == "__main__":
+    server = UDPServer(HOST, PORT)
+    data, clientAddress = server.receiveMessage()
+    print(data)
+    server.sendMessage(clientAddress[0], AuxiliaryFunctions.encode('RGR OK'), clientAddress[1])
+    server.sendMessage(clientAddress[0], AuxiliaryFunctions.encode('UAR OK'), clientAddress[1])
+    server.closeConnection()

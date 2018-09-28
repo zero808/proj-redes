@@ -18,18 +18,9 @@ def deregister():
     # writes the request message
     fullRequest = AuxiliaryFunctions.encode('UNR' + ' ' + bsName + ' ' + str(bsTCPPort) + '\n')
     server.sendMessage(csName, fullRequest, csPort)
-
-    # message, address = server.receiveMessage()
-    message, address = server.receiveMessage()
-    confirmation = AuxiliaryFunctions.decode(message).split()
     
-    if confirmation[0] == 'UAR':
-        if confirmation[1] == 'OK':
-            print('deregistry successfull')
-        elif confirmation[1] == 'NOK':
-            print('deregistry not successfull')
-        else:
-            print('syntax error')
+    waitForMessage()
+
 
 # Handles the registry of the new BS 
 def register():
@@ -37,19 +28,43 @@ def register():
     fullRequest = AuxiliaryFunctions.encode('REG' + ' ' + bsName + ' ' + str(bsTCPPort) + '\n')
     server.sendMessage(csName, fullRequest, csPort)
 
-    # confirmation from CS
+    waitForMessage()
+
+# Handles the registry response from the CS
+def handleRegistryResponse(confirmation):
+    if confirmation[1] == 'OK':
+        print('registry successfull')
+    elif confirmation[1] == 'NOK':
+        print('registry not successfull')
+    else:
+        print('syntax error')
+
+# Handles the deregistry response from the CS
+def handleDeregistryResponse(confirmation):
+    if confirmation[1] == 'OK':
+        print('deregistry successfull')
+    elif confirmation[1] == 'NOK':
+        print('deregistry not successfull')
+    else:
+        print('syntax error')
+        
+
+# Ensures that the BS is 'always on' and receives the CS and user requests and responses
+def waitForMessage():
+    # all possible messages
+    allRequests = {
+        'RGR': handleRegistryResponse,
+        'UAR': handleDeregistryResponse
+        # "LSU": registerUser
+    }
+
+    # waits for a request
     message, address = server.receiveMessage()
     confirmation = AuxiliaryFunctions.decode(message).split()
+
+    func = allRequests.get(confirmation[0])
+    return func(confirmation)
     
-    if confirmation[0] == 'RGR':
-        if confirmation[1] == 'OK':
-            print('registry successfull')
-        elif confirmation[1] == 'NOK':
-            print('registry not successfull')
-        else:
-            print('syntax error')
-
-
 
 # Reads the arguments from the command line
 def getArguments(argv):
@@ -75,6 +90,7 @@ def main(argv):
     bsTCPPort, csName, csPort = getArguments(argv)
     server = UDPserver.UDPServer(bsName, bsUDPPort)
     register()
+    # waitForMessage()
     deregister()
 
 if __name__ == "__main__":
