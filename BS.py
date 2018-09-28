@@ -8,19 +8,32 @@ import AuxiliaryFunctions
 
 # Global Variables
 
-bsName = socket.gethostname()
+bsName = socket.gethostbyname(socket.gethostname())
+bsUDPPort = 9997
 
 REG = 'REG'
+RGR = 'RGR'
 
 
 # Main Functions
 
-
 # Handles the registry of the new BS 
 def register():
     # writes the request message
-    fullRequest = AuxiliaryFunctions.encode(REG + ' ' + bsName + ' ' + str(bsPort))
+    fullRequest = AuxiliaryFunctions.encode(REG + ' ' + bsName + ' ' + str(bsTCPPort) + '\n')
     server.sendMessage(csName, fullRequest, csPort)
+
+    #confirmation from CS
+    message, address = server.receiveMessage()
+    confirmation = AuxiliaryFunctions.decode(message).split()
+    
+    if confirmation[0] == 'RGR':
+        if confirmation[1] == 'OK':
+            print('registry successfull')
+        elif confirmation[1] == 'NOK':
+            print('registry not successfull')
+        else:
+            print('syntax error')
 
 
 
@@ -33,22 +46,22 @@ def getArguments(argv):
     args = parser.parse_args()
 
     d = vars(args)
-    bsPort = d['b']
+    bsTCPPort = d['b']
     csName = d['n']
     csPort = d['p']
 
     # print(bsPort, csName, csPort)
-    return (int(bsPort), csName, int(csPort))
+    return (int(bsTCPPort), csName, int(csPort))
 
 def main(argv):
     global server 
-    global bsPort
+    global bsTCPPort
     global csName
     global csPort
 
-    bsPort, csName, csPort = getArguments(argv)
+    bsTCPPort, csName, csPort = getArguments(argv)
     #print(bsPort, csName, csPort)
-    server = UDPserver.UDPServer(bsName, bsPort)
+    server = UDPserver.UDPServer(bsName, bsUDPPort)
     register()
 
 if __name__ == "__main__":
