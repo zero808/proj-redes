@@ -8,10 +8,7 @@ import AuxiliaryFunctions
 
 # Global Variables
 
-bsPort = 59000
 bsName = socket.gethostname()
-csName = 'localhost'
-csPort = 58004
 
 REG = 'REG'
 
@@ -22,8 +19,8 @@ REG = 'REG'
 # Handles the registry of the new BS 
 def register():
     # writes the request message
-    fullRequest = AuxiliaryFunctions.writeRequest([REG,bsName,str(bsPort)])
-    server.sendMessage(csName,fullRequest)
+    fullRequest = AuxiliaryFunctions.encode(REG + ' ' + bsName + ' ' + str(bsPort))
+    server.sendMessage(csName, fullRequest, csPort)
 
 
 
@@ -41,12 +38,16 @@ def getArguments(argv):
     csPort = d['p']
 
     # print(bsPort, csName, csPort)
-
-    return args
+    return (int(bsPort), csName, int(csPort))
 
 def main(argv):
-    u = getArguments(argv)
     global server 
+    global bsPort
+    global csName
+    global csPort
+
+    bsPort, csName, csPort = getArguments(argv)
+    #print(bsPort, csName, csPort)
     server = UDPserver.UDPServer(bsName, bsPort)
     register()
 

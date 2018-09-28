@@ -23,8 +23,8 @@ class UDPServer:
         print('Received:', str(data, "utf-8"))
         return (data, clientAddress)
 
-    def sendMessage(self, clientAddress, message):
-        self.sock.sendto(message, clientAddress)
+    def sendMessage(self, clientAddress, message, clientPort):
+        self.sock.sendto(message, (clientAddress,clientPort))
 
     def closeConnection(self):
         self.sock.close()
@@ -39,6 +39,6 @@ class UDPServer:
 
 #if __name__ == "__main__":
 #    server = UDPServer(HOST, PORT)
-#   message, client = server.receiveMessage()
-#    server.sendMessage(client, message)
+#    message, client = server.receiveMessage()
+#    print(message)
 #    server.closeConnection()

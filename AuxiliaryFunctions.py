@@ -12,11 +12,11 @@ def encode(data):
 def decode(data):
     return data.decode()
 
-def writeRequest(request):
-    fullRequest = []
+#def writeRequest(request):
+#    fullRequest = []
 
-    for word in request:
-        codedWord = encode(word)
-        fullRequest += [codedWord,]
+#    for word in request:
+#        codedWord = encode(word)
+#        fullRequest += [codedWord,]
 
-    return fullRequest
+#    return fullRequest
