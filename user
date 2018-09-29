@@ -3,11 +3,11 @@
 
 import sys
 import socket
-import argparse
 
 # Auxiliary functions
 
 def initialParams():
+    import argparse
     "Sets up the initial Central Server ip and port"
     parser = argparse.ArgumentParser(sys.argv[1:])
     parser.add_argument('-n', help='Central Server name', default='localhost')
@@ -19,7 +19,7 @@ def readCommand():
     try:
         listAvailableCommands()
         command = input("$ ")
-        tokens = command.split()
+        tokens = command.split(' ')
         if len(tokens) > 0 and isValidCommand(tokens[0]):
             #pass every token
             executeCommand(tokens)
@@ -37,14 +37,64 @@ def executeCommand(command):
     valid.get(command[0])(command)
 
 def makeProtocolString(*command):
-    ret = command + ('\n',)
-    return ' '.join(ret)
+    ret =  ' '.join(command)
+    return ret + '\n'
 
-def printDirContent():
+def printDirContent(arg, dirname):
     pass
+
+def handleFilelist(arg, directory):
+    from re import findall as f
+
+    reply = arg.decode('utf8')
+    tokens = reply.split(' ', 4)
+    status, BSip, BSport, N, filelist = tokens
+    N = int(N)
+    #see the pattern in the specification
+    ex = '\w*\s\d{2}\.\d{2}\.\d{4}\s\d{2}\:\d{2}\:\d{2}\s\d*'
+    files = f(ex, filelist)
+
+    if status == 'LFD' and N > 0 and len(files) == N:
+        print('List of files in directory {0}, hosted at {1}:{2}:'.format(directory, BSip, BSport))
+        for filename in files:
+            print(filename)
+            #print('\t- {}'.format(filename))
+    else:
+        printf('No directories to display')
+
+def handleDirlist(arg):
+    tokens = arg.decode('utf8').split(' ')
+    if len(tokens) >= 2:
+        amount = int(tokens[1])
+    else:
+        amount = 0
+    if tokens[0] == 'LDR' and amount > 0:
+#        if amount == len(tokens[2:]:
+        print('List of directories:')
+        for directory in tokens[2:]:
+            print('\t- {}'.format(directory))
+    else:
+        printf('No directories to display')
 
 def getDirContent(dir):
     pass
+
+def validateUser(user):
+    return len(user) == 5 and user.isdigit()
+
+def validatePassword(password):
+    return len(password) == 8 and password.isalnum()
+
+def setCredentials(args):
+    u = args[0]
+    p = args[1]
+    if validateUser(u) and validatePassword(p):
+        global user, password
+        user = u
+        password = p
+        return True
+    else:
+        return False
 
 def isLoggedIn():
     return user != "" and password != ""
@@ -53,43 +103,40 @@ def listAvailableCommands():
     "Lists the available commands to the user in Standard Output"
     print("", "Available Commands:", sep="\n")
     if isLoggedIn():
-        print("deluser",
+        print("\t",
+                "deluser",
                 "backup dir",
                 "restore dir",
                 "dirlist",
                 "filelist dir",
                 "delete dir",
                 "logout",
-                sep="\n")
+                sep="\n\t")
     else:
-        print("login user pass")
-    print("exit")
+        print("\tlogin user pass")
+    print("\texit")
 
 def call(socket, message ):
     buffer_size = 4096
     chunks = []
-    bytes_rec = 0
     ret = NOK
 
     #Send our request (after converting it to bytes)
     socket.sendall(str.encode(message))
 
-    #keep reading the response
-    while bytes_rec < buffer_size:
+    while True:
         data = socket.recv(buffer_size)
         #the server closed the connection, i.e., there is
         #no more data to be received
         if data == b'':
             break
-        #print(data.decode())
-
         chunks.append(data)
-        bytes_rec = bytes_rec + len(data)
+
         # we got the final '\n' so this was the last message
         if data.endswith(b'\n'):
             break
 
-    ret = b''.join(chunks)
+    ret = b''.join(chunks).strip()
 
     print(ret)
     return ret
@@ -103,44 +150,50 @@ def loginAux(socket):
 
 def login(args):
     "Login with user and pass"
-    #user, password
     if not isLoggedIn() and len(args) == 3:
-        global user
-        user = args[1]
-        global password
-        password = args[2]
+        success = setCredentials(args[1:])
+        if not success:
+            print("""The username must be a 5 digits number and the password must be composed
+            of 8 alphanumeric characters""")
+            return
 
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect(CS)
             #perform service call
             status = loginAux(s)
-            if status == OK:
+
+            if status == LOGIN_SUCCESS:
                 pass
-            elif status == NOK:
+            elif status == LOGIN_FAIL:
                 #clean up
                 logout(None)
-            elif status == NEW:
+            elif status == b"AUR NEW":
                 pass
+            elif ERROR in status:
+                logout(None)
+                print("Malformed request")
             return status
     except ConnectionRefusedError:
-        print("Error in connecting to socket on port: ", sockPort)
+        print("Error in connecting to socket on port: ", CS[1])
 
 def deluser(args):
     "Deletes this user from the server"
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect(CS)
-            if loginAux(s) == OK:
+            if loginAux(s) == LOGIN_SUCCESS:
                 ret = call(s, makeProtocolString("DLU"))
-                if ret == OK:
+                if ret == b"DLR OK":
                     logout(None)
-                elif ret == NOK:
+                elif ret == b"DLR NOK":
                     print("Error: Could not delete the current user")
+                elif ERROR in ret:
+                    print("Malformed request")
             else:
                 print("Error: Could not delete the current user")
     except ConnectionRefusedError:
-        print("Error in connecting to socket on port: ", sockPort)
+        print("Error in connecting to socket on port: ", CS[1])
 
 def backup(args):
     "Performs a backup of directory dir"
@@ -152,15 +205,65 @@ def restore(args):
 
 def dirlist(args):
     "Lists all the directories"
-    pass
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.connect(CS)
+            if loginAux(s) == LOGIN_SUCCESS:
+                ret = call(s, makeProtocolString("LSD"))
+                if ERROR in ret:
+                    print("Malformed request")
+                else:
+                   handleDirlist(ret)
+            else:
+                print("Error: wrong credentials")
+    except ConnectionRefusedError:
+        print("Error in connecting to socket on port: ", CS[1])
 
 def filelist(args):
     "Lists all the files in the directory dir"
-    pass
+    if len(args) != 2:
+        print("You need to supply a directory.")
+        return
+
+    dire = args[1]
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.connect(CS)
+            if loginAux(s) == LOGIN_SUCCESS:
+                ret = call(s, makeProtocolString("LSF", dire))
+                if ERROR in ret:
+                    print("Malformed request")
+                elif ret == b'LFD NOK':
+                    print("Filelist request cannot be served")
+                else:
+                   handleFilelist(ret, dire)
+            else:
+                print("Error: wrong credentials")
+    except ConnectionRefusedError:
+        print("Error in connecting to socket on port: ", CS[1])
 
 def delete(args):
     "Deletes directory dir"
-    pass
+    if len(args) != 2:
+        print("You need to supply a directory.")
+        return
+
+    dire = args[1]
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.connect(CS)
+            if loginAux(s) == LOGIN_SUCCESS:
+                ret = call(s, makeProtocolString("DEL", dire))
+                if ERROR in ret:
+                    print("Malformed request")
+                elif ret == b'DDR NOK':
+                    print("Error: Cannot delete directory {}".format(dire))
+                elif ret == b'DDR OK':
+                    print("Successfully deleted directory {}".format(dire))
+            else:
+                print("Error: wrong credentials")
+    except ConnectionRefusedError:
+        print("Error in connecting to socket on port: ", CS[1])
 
 def logout(args):
     "Logs out the current logged user"
@@ -183,7 +286,9 @@ def exit(args):
 # Global variables
 ###########################################
 #Return codes
-OK = "OK"
+LOGIN_SUCCESS = b'AUR OK'
+LOGIN_FAIL = b'AUR NOK'
+ERROR = b'ERR'
 NOK = "NOK"
 NEW = "NEW"
 
