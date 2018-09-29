@@ -11,7 +11,31 @@ import AuxiliaryFunctions
 bsName = socket.gethostbyname(socket.gethostname())
 bsUDPPort = 9997
 
+userList = {}
+
 # Main Functions
+
+# Confirmation of the user registration
+def handleUserRegistry(status):
+    fullResponse = AuxiliaryFunctions.encode('LUR ' + status + '\n')
+    server.sendMessage(csName, fullResponse, csPort)
+
+# Adds a new user to the userList
+def registerUser(userData):
+    try:
+        userName = userData[1]
+        userPassword = userData[2]
+        userList[userName] = userPassword
+        if userName in userList:
+            handleUserRegistry('OK')
+            print('user registered')
+        else:
+            # in case of the userList not being updated
+            handleUserRegistry('NOK')
+    except:
+        handleUserRegistry('ERR')
+
+    waitForMessage()
 
 # Handles the deregistry of the BS
 def deregister():
@@ -54,8 +78,8 @@ def waitForMessage():
     # all possible messages
     allRequests = {
         'RGR': handleRegistryResponse,
-        'UAR': handleDeregistryResponse
-        # "LSU": registerUser
+        'UAR': handleDeregistryResponse,
+        'LSU': registerUser
     }
 
     # waits for a request
@@ -82,6 +106,7 @@ def getArguments(argv):
     return (int(bsTCPPort), csName, int(csPort))
 
 def main(argv):
+
     global server 
     global bsTCPPort
     global csName
@@ -90,7 +115,7 @@ def main(argv):
     bsTCPPort, csName, csPort = getArguments(argv)
     server = UDPserver.UDPServer(bsName, bsUDPPort)
     register()
-    # waitForMessage()
+    waitForMessage()
     deregister()
 
 if __name__ == "__main__":
