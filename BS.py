@@ -11,7 +11,7 @@ import AuxiliaryFunctions
 bsName = socket.gethostbyname(socket.gethostname())
 bsUDPPort = 9997
 
-userList = {}
+userList = {} 
 
 # Main Functions
 
@@ -22,18 +22,21 @@ def handleUserRegistry(status):
 
 # Adds a new user to the userList
 def registerUser(userData):
-    try:
-        userName = userData[1]
-        userPassword = userData[2]
-        userList[userName] = userPassword
-        if userName in userList:
-            handleUserRegistry('OK')
-            print('user registered')
-        else:
-            # in case of the userList not being updated
-            handleUserRegistry('NOK')
-    except:
+    if len(userData) != 2 or not isinstance(userData[0], int):
         handleUserRegistry('ERR')
+        raise IOError("syntax error")
+    
+    userName = userData[0]
+    userPassword = userData[1]
+    userList[userName] = userPassword
+
+    if userName in userList and userList.get(userName) == userPassword:
+        # if userList was updated correctly
+        handleUserRegistry('OK')
+        print('user registered')
+    else:
+        # if userList was not updated correctly
+        handleUserRegistry('NOK')
 
     waitForMessage()
 
@@ -56,18 +59,18 @@ def register():
 
 # Handles the registry response from the CS
 def handleRegistryResponse(confirmation):
-    if confirmation[1] == 'OK':
+    if confirmation[0] == 'OK':
         print('registry successfull')
-    elif confirmation[1] == 'NOK':
+    elif confirmation[0] == 'NOK':
         print('registry not successfull')
     else:
         print('syntax error')
 
 # Handles the deregistry response from the CS
 def handleDeregistryResponse(confirmation):
-    if confirmation[1] == 'OK':
+    if confirmation[0] == 'OK':
         print('deregistry successfull')
-    elif confirmation[1] == 'NOK':
+    elif confirmation[0] == 'NOK':
         print('deregistry not successfull')
     else:
         print('syntax error')
@@ -87,7 +90,11 @@ def waitForMessage():
     confirmation = AuxiliaryFunctions.decode(message).split()
 
     func = allRequests.get(confirmation[0])
-    return func(confirmation)
+
+    if func == None:
+        raise IOError('ERR')
+    else:
+        return func(confirmation[1:])
     
 
 # Reads the arguments from the command line
@@ -106,17 +113,21 @@ def getArguments(argv):
     return (int(bsTCPPort), csName, int(csPort))
 
 def main(argv):
+    try:
+        global server 
+        global bsTCPPort
+        global csName
+        global csPort
 
-    global server 
-    global bsTCPPort
-    global csName
-    global csPort
+        bsTCPPort, csName, csPort = getArguments(argv)
+        server = UDPserver.UDPServer(bsName, bsUDPPort)
+        register()
+        waitForMessage()
+    except KeyboardInterrupt:
+        deregister()
+        print('BS service deregistered')
+        sys.exit(1)
 
-    bsTCPPort, csName, csPort = getArguments(argv)
-    server = UDPserver.UDPServer(bsName, bsUDPPort)
-    register()
-    waitForMessage()
-    deregister()
 
 if __name__ == "__main__":
     main(sys.argv[1:])
