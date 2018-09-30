@@ -4,9 +4,9 @@ import socket
 
 class TCPServer(metaclass=ABCMeta):
 
-	def __init__(self, TCP_PORT):
+	def __init__(self, TCP_IP, TCP_PORT):
 		self.TCP_PORT = TCP_PORT
-		self.TCP_IP = socket.gethostbyname(socket.gethostname())
+		self.TCP_IP = TCP_IP
 		self.BUFFER_SIZE = 4096
 		
 		try:
@@ -14,12 +14,9 @@ class TCPServer(metaclass=ABCMeta):
 			self.s.bind((self.TCP_IP, self.TCP_PORT))
 			self.s.listen()
 		except socket.gaierror as msg:
-			print('Bind was not successful')
-			sys.exit(1)
+			raise IOError('Bind was not successful')
 		except socket.error as msg:
-			print('Something went wrong in the process of socket creation')
-			sys.exit(1)
-		
+			raise IOError('Something went wrong in the process of socket creation')		
 
 	def establishConnection(self):
 		self.conn, self.addr = self.s.accept()
@@ -35,8 +32,7 @@ class TCPServer(metaclass=ABCMeta):
 			try:
 				data = self.conn.recv(self.BUFFER_SIZE)
 			except:
-				print("recv failed")
-				sys.exit(1)
+				raise IOError('recv failed')
 			
 			receivedMessage += data
 			
@@ -51,13 +47,13 @@ class TCPServer(metaclass=ABCMeta):
 				try:
 					reply = str.encode(self.interpretMessage(receivedMessage))				
 				except IOError as msg:
-					reply = msg
+					reply = str.encode(str(msg))
 				except:
-					print("ERR")
-					sys.exit(1)
+					raise IOError('ERR')
 				
 				receivedMessage = b''
-				self.conn.send(reply + b'\n')
+				reply += b'\n'
+				self.conn.send(reply)
 				print('Sent to', self.addr, "is '", reply, "'")
 		
 		self.conn.close()

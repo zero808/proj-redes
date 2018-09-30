@@ -17,7 +17,9 @@ class UDPClient(metaclass=ABCMeta):
 	
 	# return the reply from the server
 	def sendMessage(self, message):
-		self.s.sendto(message + b'\n', (self.UDP_IP, self.UDP_PORT))
+		message += b'\n'
+		print('Sent to', (self.UDP_IP, self.UDP_PORT), "is '", reply, "'")
+		self.s.sendto(message, (self.UDP_IP, self.UDP_PORT))
 		
 		while True:
 			# receive (part of) message from the socket
