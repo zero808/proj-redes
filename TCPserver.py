@@ -21,7 +21,6 @@ class TCPServer:
         try:        
             self.sock.listen() # not specified, default value is 5
             self.connection, self.clientAddress = self.sock.accept() # returns new connection and the client address
-            print('Connected by ', self.clientAddress)
         except socket.error as e:
             print('error connecting to the user: ', e)
 
@@ -29,20 +28,16 @@ class TCPServer:
         try:
             data = self.connection.recv(BUFFER_SIZE)
 
-            print(data)
-
             if not data: return None
 
             fullMessage = b''
             while True: # messages will end with \n
                 fullMessage += data
-                print('fullMessage: ', fullMessage)
                 if b'\n' in data:
                     break
 
                 data = self.connection.recv(BUFFER_SIZE)
 
-            #print('chegou aqui')
             return fullMessage
 
         except socket.error as e:

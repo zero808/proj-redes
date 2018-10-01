@@ -2,6 +2,7 @@
 import socket
 import sys
 import argparse
+import os
 import UDPserver
 import TCPserver
 import AuxiliaryFunctions
@@ -11,7 +12,7 @@ import AuxiliaryFunctions
 bsName = socket.gethostbyname(socket.gethostname())
 bsUDPPort = 9997
 
-userList = {86415:'password'} 
+userList = {} 
 
 # Main Functions
 
@@ -54,10 +55,16 @@ def waitForUserMessage():
     message = tcpserver.receiveMessage()
     confirmation = AuxiliaryFunctions.decode(message).split()
 
+    print(confirmation)
+
     func = allRequests.get(confirmation[0])
+
+    print(func)
     if func == None:
+        print('ups')
         handleUnexpectedTCPProtocolMessage()
     else:
+        print('entrou aqui')
         return func(confirmation[1:])
 
 
@@ -93,7 +100,7 @@ def deregister():
     # writes the request message
     fullRequest = AuxiliaryFunctions.encode('UNR' + ' ' + bsName + ' ' + str(bsTCPPort) + '\n')
     udpserver.sendMessage(csName, fullRequest, csPort)
-    
+    udpserver.closeConnection() 
     waitForCSMessage()
 
 # Handles the registry of the new BS 
@@ -150,7 +157,7 @@ def waitForCSMessage():
 # Reads the arguments from the command line
 def getArguments(argv):
     parser = argparse.ArgumentParser(argv)
-    parser.add_argument('-b', help = 'Backup Server port', default = '59000')
+    parser.add_argument('-b', help = 'Backup Server port', default = '5005')
     parser.add_argument('-n', help = 'Central Server name', default = 'localhost')
     parser.add_argument('-p', help = 'Central Server port', default = '58004')
     args = parser.parse_args()
@@ -179,19 +186,40 @@ def main(argv):
         }
 
         bsTCPPort, csName, csPort = getArguments(argv)
-        #udpserver = UDPserver.UDPServer(bsName, bsUDPPort)
-        tcpserver = TCPserver.TCPServer('localhost', 5005)
-        tcpserver.establishConnection()
-        #register()
-        #while True: 
-        waitForUserMessage()
-        tcpserver.closeConnection()
+
+        try: 
+            pidTCPserver = os.fork()
+        except OSError as e:
+            print('Could not create a child process')
+            sys.exit(1)
+        
+        if pidTCPserver == 0:
+            print(bsName, bsTCPPort)
+            tcpserver = TCPserver.TCPServer(bsName, bsTCPPort)
+            tcpserver.establishConnection()
+
+            while True:
+                waitForUserMessage()
+            
+            tcpserver.closeConnection()
+        
+        else:
+            udpserver = UDPserver.UDPServer(bsName, bsUDPPort)
+            register()
+            while True:
+                waitForCSMessage()
+            
+            udpserver.closeConnection()
+        
+        try:
+            pid, status = os.waitpid(pidTCPserver, 0)
+        except OSError as e:
+            print('Child process did not complete successfully')
+            sys.exit(1)
 
     except KeyboardInterrupt:
         deregister()
-        udpserver.closeConnection() 
         print('BS service deregistered')
-        sys.exit(1)
 
 
 if __name__ == "__main__":
