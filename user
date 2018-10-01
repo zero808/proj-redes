@@ -76,8 +76,51 @@ def handleDirlist(arg):
     else:
         printf('No directories to display')
 
-def getDirContent(dir):
-    pass
+def timestampToString(ts):
+    template =  "{0}.{1}.{2} {3}:{4}:{5}"
+    #TODO fix cases where the day/month/etc is < 10
+    #example January is 1 but should be 01
+    out = template.format(ts.year, ts.month, ts.day, ts.hour, ts.minute, ts.second)
+    return out.encode()
+
+def getDirContent(diri):
+    import os
+    import fileinput
+    import datetime
+
+    currentPath = ''.join([os.getcwd(), '/', dir])
+    filesContent = {}
+
+    #FIXME we do not want to read all the files, just the subset
+    #sent by the CS!!!
+    #we might need a function to get the filenames and all the metadata
+    #and another for the contents
+    try:
+        #change directory to avoid having to build a string with
+        #the absolute path to the file(s)
+        os.chdir(dir)
+        for filename in os.listdir(os.curdir): #FIXME substitute
+            with open(filename, 'rb') as f:
+                #save the content of the file
+                fileContent = f.read()
+                #get the size in bytes and time of last modification
+                stat = os.lstat(filename)
+                fileSize = stat.st_size
+                timestamp = datetime.datetime.fromtimestamp(stat.st_mtime)
+                #associate a filename with all the relevant information
+                filesContent[filename] = (fileContent, fileSize, timestampToString(timestamp))
+
+        os.chdir('..') #go back
+    except (OSError, FileNotFoundError, OverflowError) as err:
+        print('OS error: {0}'.format(err))
+
+    return filesContent
+
+def stringifyDirlist(filesContent):
+    result = []
+    for item in fileContent.items():
+        pass
+        #result.append(b''.join([item[0].decode(), str(item[1][0]).decode()
 
 def validateUser(user):
     return len(user) == 5 and user.isdigit()
@@ -197,7 +240,28 @@ def deluser(args):
 
 def backup(args):
     "Performs a backup of directory dir"
-    pass
+    #dict with filaname : file contents
+    #we will send the above two and len(dict[filename])
+    dirname = args[0]
+    dirFiles = getDirContent(dirname)
+    N = 0
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.connect(CS)
+            if loginAux(s) == LOGIN_SUCCESS:
+                ret = call(s, makeProtocolString("BCK"))
+                elif ERROR in ret:
+                    print("Malformed request")
+            else:
+                print("Error: Could not backup the directory {}".format(dir))
+    except ConnectionRefusedError:
+        print("Error in connecting to socket on port: ", CS[1])
+    #login to the CS
+    #send the list of files
+    #save the subset of the files that will actually be transmitted
+    #login to BS
+    #send the files
+#ver  print(os.stat(f.filename()))
 
 def restore(args):
     "Restores the directory dir"

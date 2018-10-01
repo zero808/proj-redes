@@ -1,8 +1,13 @@
 #!/usr/bin/env python3
 
 import sys
+import os
 import re
 import signal
+import socket
+import pickle
+from random import randint
+
 from TCP import server as TCPServer
 from UDP import server as UDPServer
 from UDP import client as UDPClient
@@ -10,12 +15,12 @@ from UDP import client as UDPClient
 users = {}
 currentUser = None
 currentPassword = None
-backupServers = {}
+pids = []
 
 class serverTCP(TCPServer.TCPServer):
 	
-	def __init__(self, PORT):
-		TCPServer.TCPServer.__init__(self, PORT)
+	def __init__(self, HOST, PORT):
+		TCPServer.TCPServer.__init__(self, HOST, PORT)
 		
 		# self.possibleMessages has all the available commands to execute
 		self.possibleMessages = {
@@ -76,13 +81,21 @@ class serverTCP(TCPServer.TCPServer):
 		return user is not None
 	
 	def getRandomBS(self):
-		return 1
+		fileWithBS = open("backupServers", "rb")
+		backupServers = pickle.load(fileWithBS)
+		
+		# backupServers is not empty
+		if len(backupServers) > 0:
+			backupServers[randint(0, len(backupServers) - 1)]
+			return backupServers[randint(0, len(backupServers) - 1)]
+		else:
+			raise IOError("No Backup Servers connected")
 	
 	def login(self, args):
 		global currentUser, currentPassword, users
 		
 		try:
-			int(args[0])
+			args[0] = int(args[0])
 		except ValueError:
 			raise IOError("AUR ERR")
 			
@@ -101,8 +114,11 @@ class serverTCP(TCPServer.TCPServer):
 		elif isUser:
 			return "AUR NOK"
 		else:
-			users[user] = {'password': password}
-			users[user]['dirs'] = {}
+			users[user] = {
+				'password': password,
+				'dirs': {}
+			}
+			
 			currentUser = user
 			currentPassword = password
 			return "AUR NEW"
@@ -111,6 +127,8 @@ class serverTCP(TCPServer.TCPServer):
 		
 		global currentUser, users
 		
+		# duvida ? aqui deve enviar DLR NOK ou ERR
+		# corrigir os outros identicos
 		if not self.existsUser(currentUser):
 			raise IOError("ERR")
 		
@@ -155,39 +173,25 @@ class serverTCP(TCPServer.TCPServer):
 			file['size'] = args[i + 2]
 			filesToUpload.append(file)
 		
-		# it means that this dictionary is empty
-		if not users[currentUser]['dirs'] or dir not in users[currentUser]['dirs'].keys():
-			
-			if not users[currentUser]['dirs']:
-				users[currentUser]['dirs'] = {}
-			
-			i = 0
-			while i < 3:
-				# will create a new user in a random BS
-				ipBS, portBS = getRandomBS()
-				# it will try 5 times to contact the BS that was chosen
-				j = 0
-				while j < 5:
-					client_UDP = clientUDP(bs['IP'], bs['PORT'])
-					reply = client_UDP.registerUserToBS(currentUser, currentPassword)			
-					if reply == 'OK':
-						users[currentUser]['dirs'][dir] = {'BS': {'IP': ipBS, 'PORT': portBS}}
-						break
-					j += 1
-				
-				# it means that was successful in the process of register the user to a BS
-				if j < 5:
-					break
-				
-				i += 1
-			
-			if i >= 3:
-				print("ERR")
-				sys.exit(1)
+		fileWithBS = open("backupServers", "rb")
+		backupServers = pickle.load(fileWithBS)
+		
+		# if the given dir is not saved
+		if not users[currentUser]['dirs'] or dir not in users[currentUser]['dirs'].keys() or users[currentUser]['dirs'][dir]['BS'] not in backupServers:
+						
+			try:
+				bs = self.getRandomBS()
+			except IOError:
+				raise IOError("BKR EOF")
+					
+			client_UDP = clientUDP(bs)
+			reply = client_UDP.registerUserToBS(currentUser, currentPassword)			
+			if reply == 'OK':
+				users[currentUser]['dirs'][dir] = {'BS': bs}
 		
 		else:
 			bs = users[currentUser]['dirs'][dir]['BS']
-			client_UDP = clientUDP(bs['IP'], bs['PORT'])
+			client_UDP = clientUDP(bs)
 			receivedMessage = client_UDP.listFiles(currentUser, currentPassword)
 			words = receivedMessage.split()
 			for i in range(0, len(words), 3):
@@ -198,16 +202,71 @@ class serverTCP(TCPServer.TCPServer):
 				if file in filesToUpload:
 					filesToUpload.remove(file)
 		
-		stringToReturn = "BKR " + users[currentUser]['dirs']['BS']['IP'] + " " + users[currentUser]['dirs']['BS']['PORT'] + len(filesToUpload) + " "
+		stringToReturn = "BKR " + users[currentUser]['dirs']['BS']['IPBS'] + " " + users[currentUser]['dirs']['BS']['portBS'] + len(filesToUpload)
 		for file in filesToUpload:
-			stringToReturn += "(" + file['filename'] + " " + file['date_time'] + " " + file['size'] + ") "
+			stringToReturn += " " + str(file['filename']) + " " + str(file['date_time']) + " " + str(file['size'])
 		
-		return stringToReturn[:-1]
+		return stringToReturn
+		
+		
+	def listDirBackedUp(self, args):
+		global currentUser, users
+		
+		if len(args) != 0:
+			raise IOError("LSD ERR")
+		
+		strToReturn = "LDR " + str(len(users[currentUser]['dirs'].keys()))
+		
+		fileWithBS = open("backupServers", "rb")
+		backupServers = pickle.load(fileWithBS)
+		
+		for dir in users[currentUser]['dirs'].keys():
+			if users[currentUser]['dirs'][dir]['BS'] in backupServers:
+				strToReturn += " " + dir
+		
+		return strToReturn
+	
+	def listFilesBackedUpInDir(self, args):
+		global users, currentUser
+		
+		if len(args) != 1 and not isinstance(args[0], str):
+			raise IOError("LSF ERR")
+		
+		# duvida ? tem que fazer login antes de pedir para listar
+		
+		fileWithBS = open("backupServers", "rb")
+		backupServers = pickle.load(fileWithBS)
+		
+		if args[0] not in users[currentUser]['dirs']:
+			return "LFD NOK"
+		
+		bs = users[currentUser]['dirs'][args[0]]['BS']
+		
+		# we cannot retrieve the files because there is no BS where the dir was saved
+		if bs not in backupServers:
+			raise IOError("LFD NOK")
+		
+		client_UDP = clientUDP(bs)
+		files = client_UDP.listFiles(currentUser, args[0])
+		
+		strToReturn = "LFD " + str(bs['IPBS']) + " " + str(bs['portBS']) + " " + str(len(files))
+		
+		for file in files:
+			strToReturn += " " + str(file['filename']) + " " + str(file['date_time']) + " " + str(file['size'])
+		
+		return strToReturn
+	
+	# DEL dir
+	#'DEL': {
+	#	'function': 'deleteDir',
+	#	'commandReturn': 'DDR' # DDR status
+	#}	
+	
 
 class serverUDP(UDPServer.UDPServer):
 	
-	def __init__(self, PORT):
-		UDPServer.UDPServer.__init__(self, PORT)
+	def __init__(self, HOST, PORT):
+		UDPServer.UDPServer.__init__(self, HOST, PORT)
 		
 		# self.possibleMessages has all the available commands to execute
 		self.possibleMessages = {
@@ -236,34 +295,49 @@ class serverUDP(UDPServer.UDPServer):
 		command = listMessage[0]
 		args = listMessage[1:]
 		
-		if command in self.possibleMessages.keys():
-			possibleArgs = self.possibleMessages[command]['arguments']
-		else:
-			raise IOError("ERR")
-		
 		# if there is no errors then will execute the right fucntion
 		return getattr(self, self.possibleMessages[command]['function'])(args)
 		
-	def registerBS(self, args):
+	def registerBS(self, args):		
+		try:
+			args[1] = int(args[1])
+		except ValueError:
+			raise IOError("RGR ERR")
 		
-		if len(args) != 2 or not isinstance(args[0], str) or not isinstance(args[1], int):
-			raise IOError("REG ERR")
+		if len(args) != 2 or not isinstance(args[0], str):
+			raise IOError("RGR ERR")
+		
+		fileWithBS = open("backupServers", "rb")
+		backupServers = pickle.load(fileWithBS)
 		
 		bs = {'IPBS': args[0], 'portBS': args[1]}
 		if bs not in backupServers:
 			backupServers.append(bs)
+			fileWithBS = open("backupServers", "wb")
+			pickle.dump(backupServers, fileWithBS, protocol=pickle.HIGHEST_PROTOCOL)
+			fileWithBS.close()
 			return "RGR OK"
 		else:
 			return "RGR NOK"
 	
-	def unregisterBS(self, args):
-		
-		if len(args) != 2 or not isinstance(args[0], str) or not isinstance(args[1], int):
+	def unregisterBS(self, args):		
+		try:
+			args[1] = int(args[1])
+		except ValueError:
 			raise IOError("UAR ERR")
+		
+		if len(args) != 2 or not isinstance(args[0], str):
+			raise IOError("UAR ERR")
+		
+		fileWithBS = open("backupServers", "rb")
+		backupServers = pickle.load(fileWithBS)
 		
 		bs = {'IPBS': args[0], 'portBS': args[1]}
 		if bs in backupServers:
 			backupServers.remove(bs)
+			fileWithBS = open("backupServers", "wb")
+			pickle.dump(backupServers, fileWithBS, protocol=pickle.HIGHEST_PROTOCOL)
+			fileWithBS.close()
 			return "UAR OK"
 		else:
 			return "UAR NOK"
@@ -294,77 +368,101 @@ class clientUDP(UDPClient.UDPClient):
 		}
 	
 	def listFiles(self, user, dir):
-		if not isinstance(user, int) or not isinstance(dir, str):
-			print("ERR")
-			sys.exit(1)
 		
-		reply = sendMessage('LSF ' + user + ' ' + dir)
-		if 'ERR' in reply:
-			print("ERR")
-			sys.exit(1)
-			
+		try:
+			user = int(user)
+		except ValueError:
+			raise IOError("LSF ERR")
+		
+		if not isinstance(dir, str):
+			raise IOError("LSF ERR")
+		
+		reply = sendMessage('LSF ' + user + ' ' + dir)			
 		reply = reply.split()
-		if reply[0] == 'LFD' and isinstance(reply[1], int) and (len(reply) - 2) % 3 == 0:
-			return reply[2:]
+		
+		try:
+			reply[1] = int(reply[1])
+		except ValueError:
+			raise IOError("LFD ERR")
+		
+		if reply[0] == 'LFD' and (len(reply) - 2) % 3 == 0 and (len(reply) - 2) / 3 == reply[1]:
+			files = []
+			for i in range(2, reply[1] + 2, 3):
+				file = {}
+				file['filename'] = reply[i]
+				file['date_time'] = reply[i + 1]
+				file['size'] = reply[i + 2]
+				files.append(file)
+			return files
 		else:
-			print("ERR")
-			sys.exit(1)			
+			raise IOError("LFD ERR")			
 	
 	def registerUserToBS(self, user, password):
-		if not isinstance(user, int) or not isinstance(password, str):
-			print("ERR")
-			sys.exit(1)
+		try:
+			user = int(user)
+		except ValueError:
+			raise IOError("LSU ERR")
 		
-		reply = sendMessage('LSU ' + user + ' ' + password)
-		if 'ERR' in reply:
-			print("ERR")
-			sys.exit(1)
+		if not isinstance(password, str):
+			raise IOError("LSU ERR")
+		
+		reply = self.sendMessage('LSU ' + user + ' ' + password)
 		
 		reply = reply.split()
 		if len(reply) == 2 and reply[0] == 'LUR' and ('OK' in reply[1] or 'NOK' in reply[1]):
 			return reply[1]
 		else:
-			print("ERR")
-			sys.exit(1)
+			raise IOError("LSU ERR")
 	
 	def deleteDir(self, user, dir):
-		if not isinstance(user, int) or not isinstance(dir, str):
-			print("ERR")
-			sys.exit(1)
+		try:
+			user = int(user)
+		except ValueError:
+			raise IOError("DLB ERR")
 		
-		reply = sendMessage('DLB ' + user + ' ' + dir)
-		if 'ERR' in reply:
-			print("ERR")
-			sys.exit(1)
+		if not isinstance(dir, str):
+			raise IOError("DLB ERR")
+		
+		reply = self.sendMessage('DLB ' + user + ' ' + dir)
 		
 		reply = reply.split()
 		if len(reply) == 2 and reply[0] == 'DBR' and ('OK' in reply[1] or 'NOK' in reply[1]):
 			return reply[1]
 		else:
-			print("ERR")
-			sys.exit(1)
+			raise IOError("DLB ERR")
 			
 			
 			
 			
 			
+def pidExists(pid):
+	try:
+		os.kill(pid, 0)
+	except OSError:
+		# if it raises OSError, there is no process with the given pid
+		return False
+	
+	return True
 			
-			
-			
+def serverErrorHandle():
+	global pids
+	
+	myPID = os.getpid()
+	for pid in pids:
+		if pid != myPID and pidExists(pid):
+			os.kill(pid, signal.SIGTERM)
+	
+	if pids[0] == myPID:
+		print("\nThanks for using this CS")
 
 def sigterm_handler(_signo, _stack_frame):
-	# Raises SystemExit(0):
+	serverErrorHandle()
 	sys.exit(0)
 		
 if __name__ == "__main__":
 	
-	# for Ctrl+c command
-	signal.signal(signal.SIGINT, sigterm_handler)
-	# for kill command
-	signal.signal(signal.SIGTERM, sigterm_handler)
-	
 	PORT = 58004
-	
+	HOST = socket.gethostbyname(socket.gethostname())
 	# read all arguments (it only matters the "-p" argument)
 	lenArgv = len(sys.argv)
 	for index in range(0, lenArgv):
@@ -372,16 +470,57 @@ if __name__ == "__main__":
 			index += 1
 			PORT = int(sys.argv[index])
 	
-	server_TCP = serverTCP(PORT)
-	server_UDP = serverUDP(PORT)
-	try:
-		while True:
-			server_TCP.establishConnection()
-			server_TCP.run()
-			#server_UDP.run()
-	except (IOError, RuntimeError) as exception:
-		print(exception)
-	finally:
-		print("\nThanks for using this CS")
-			
+	print("CS is running at " + str(HOST) + ":" + str(PORT))
+	
+	fileWithBS = open("backupServers", "wb")
+	pickle.dump([], fileWithBS, protocol=pickle.HIGHEST_PROTOCOL)
+	fileWithBS.close()
+	
+	pids.append(os.getpid())
+	pidUDPServer = os.fork()
+	if pidUDPServer == 0:
+		pids.append(os.getpid())
 		
+		#this will be the child process
+		try:
+			server_UDP = serverUDP(HOST, PORT)
+			while True:
+				server_UDP.run()
+		except IOError as error:
+			print(error)
+			serverErrorHandle()
+			sys.exit(1)
+		except Exception:
+			print("Something went wrong. Please restart the Central Server")
+			serverErrorHandle()
+			sys.exit(1)
+			
+	elif pidUDPServer != -1:
+		# this will be the parent process
+		pids.append(pidUDPServer)
+		
+		# for Ctrl+c command
+		signal.signal(signal.SIGINT, sigterm_handler)
+		# for kill command
+		signal.signal(signal.SIGTERM, sigterm_handler)
+		
+		try:
+			server_TCP = serverTCP(HOST, PORT)
+			while True:
+				server_TCP.establishConnection()
+				server_TCP.run()
+		except IOError as error:
+			print(error)
+			serverErrorHandle()
+			sys.exit(1)
+		except Exception as msg:
+			print(msg)
+			print("Something went wrong. Please restart the Central Server")
+			serverErrorHandle()
+			sys.exit(1)
+			
+	else:
+		print("No fork was made. Please try restart the Central Server")
+		serverErrorHandle()
+		sys.exit(1)
+			
