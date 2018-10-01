@@ -77,18 +77,19 @@ def handleDirlist(arg):
         printf('No directories to display')
 
 def timestampToString(ts):
-    template =  "{0}.{1}.{2} {3}:{4}:{5}"
+    #template =  "{0}.{1}.{2} {3}:{4}:{5}"
     #TODO fix cases where the day/month/etc is < 10
     #example January is 1 but should be 01
-    out = template.format(ts.year, ts.month, ts.day, ts.hour, ts.minute, ts.second)
-    return out.encode()
+    #out = template.format(ts.year, ts.month, ts.day, ts.hour, ts.minute, ts.second)
+    out = ts.strftime('%Y.%m.%d %H:%M:%s')
+    return out
 
 def getDirContent(diri):
     import os
     import fileinput
     import datetime
 
-    currentPath = ''.join([os.getcwd(), '/', dir])
+    currentPath = ''.join([os.getcwd(), '/', diri])
     filesContent = {}
 
     #FIXME we do not want to read all the files, just the subset
@@ -98,7 +99,7 @@ def getDirContent(diri):
     try:
         #change directory to avoid having to build a string with
         #the absolute path to the file(s)
-        os.chdir(dir)
+        os.chdir(diri)
         for filename in os.listdir(os.curdir): #FIXME substitute
             with open(filename, 'rb') as f:
                 #save the content of the file
@@ -116,11 +117,11 @@ def getDirContent(diri):
 
     return filesContent
 
-def stringifyDirlist(filesContent):
+def stringifyDirlistCS(filesContent):
     result = []
-    for item in fileContent.items():
-        pass
-        #result.append(b''.join([item[0].decode(), str(item[1][0]).decode()
+    for item in filesContent.items():
+        result.append(' '.join([item[0], item[1][2],  str(item[1][1])]))
+    return ' '.join(result)
 
 def validateUser(user):
     return len(user) == 5 and user.isdigit()
@@ -167,17 +168,20 @@ def call(socket, message ):
     #Send our request (after converting it to bytes)
     socket.sendall(str.encode(message))
 
-    while True:
-        data = socket.recv(buffer_size)
-        #the server closed the connection, i.e., there is
-        #no more data to be received
-        if data == b'':
-            break
-        chunks.append(data)
+    try:
+        while True:
+            data = socket.recv(buffer_size)
+            #the server closed the connection, i.e., there is
+            #no more data to be received
+            if data == b'':
+                break
+            chunks.append(data)
 
-        # we got the final '\n' so this was the last message
-        if data.endswith(b'\n'):
-            break
+            # we got the final '\n' so this was the last message
+            if data.endswith(b'\n'):
+                break
+    except ConnectionResetError:
+        print("erro")
 
     ret = b''.join(chunks).strip()
 
@@ -242,16 +246,23 @@ def backup(args):
     "Performs a backup of directory dir"
     #dict with filaname : file contents
     #we will send the above two and len(dict[filename])
-    dirname = args[0]
+    dirname = args[1]
     dirFiles = getDirContent(dirname)
-    N = 0
+    dirBytes = stringifyDirlistCS(dirFiles)
+    N = len(dirFiles.keys())
     try:
+        #connect to the CS
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect(CS)
             if loginAux(s) == LOGIN_SUCCESS:
-                ret = call(s, makeProtocolString("BCK"))
+                ret = call(s, makeProtocolString("BCK", str(N), dirBytes))
+                if ret.startswith(b'BKR'):
+                    print("sucesso")
+                    print(ret)
                 elif ERROR in ret:
                     print("Malformed request")
+            elif ERROR in ret:
+                print("Malformed request")
             else:
                 print("Error: Could not backup the directory {}".format(dir))
     except ConnectionRefusedError:
