@@ -11,51 +11,98 @@ import AuxiliaryFunctions
 bsName = socket.gethostbyname(socket.gethostname())
 bsUDPPort = 9997
 
-userList = {} 
+userList = {86415:'password'} 
 
 # Main Functions
 
-# Confirmation of the user registration
-def handleUserRegistry(status):
-    fullResponse = AuxiliaryFunctions.encode('LUR ' + status + '\n')
-    server.sendMessage(csName, fullResponse, csPort)
+#############
+# User - BS #
+#############
+
+# user authentication
+def authenticateUser(userData):
+    try:
+        userName = int(userData[0])
+        userPassword = userData[1]
+        if len(userData) != 2:
+            handleUserAuthentication('NOK')
+        elif userName not in userList or (userName in userList and userList.get(userName) != userPassword):
+            # if the user doesn't exist or the password is wrong
+            handleUserAuthentication('NOK')
+        else:
+            # valid authentication
+            handleUserAuthentication('OK')
+
+    except ValueError:
+        # if the userName isn't an int
+        handleUserAuthentication('NOK')
+
+# confirmation of the user authentication
+def handleUserAuthentication(status):
+    fullResponse = AuxiliaryFunctions.encode('AUR ' + status + '\n')
+    tcpserver.sendMessage(fullResponse)
+
+# Handles unexpected TCP protocol messages
+def handleUnexpectedTCPProtocolMessage():
+    fullResponse = AuxiliaryFunctions.encode('ERR\n')
+    tcpserver.sendMessage(fullResponse)
+
+# Receives the user requests and responses
+def waitForUserMessage():
+
+    # waits for a request/response
+    message = tcpserver.receiveMessage()
+    confirmation = AuxiliaryFunctions.decode(message).split()
+
+    func = allRequests.get(confirmation[0])
+    if func == None:
+        handleUnexpectedTCPProtocolMessage()
+    else:
+        return func(confirmation[1:])
+
+
+
+#############
+#  CS - BS  #
+#############
 
 # Adds a new user to the userList
 def registerUser(userData):
-    if len(userData) != 2 or not isinstance(userData[0], int):
+    try:
+        userName = int(userData[0])
+        userPassword = userData[1]
+
+        if len(userData) != 2:
+            handleUserRegistry('ERR')
+            # raise IOError("syntax error")
+        elif userName in userList and userList.get(userName) == userPassword:
+            # if the userList was not updated
+            handleUserRegistry('NOK')
+            print('list not updated')
+        else:
+            userList[userName] = userPassword
+            # if userList was updated correctly
+            handleUserRegistry('OK')
+            print('user registered')
+
+    except ValueError:
         handleUserRegistry('ERR')
-        raise IOError("syntax error")
-    
-    userName = userData[0]
-    userPassword = userData[1]
-    userList[userName] = userPassword
-
-    if userName in userList and userList.get(userName) == userPassword:
-        # if userList was updated correctly
-        handleUserRegistry('OK')
-        print('user registered')
-    else:
-        # if userList was not updated correctly
-        handleUserRegistry('NOK')
-
-    waitForMessage()
 
 # Handles the deregistry of the BS
 def deregister():
     # writes the request message
     fullRequest = AuxiliaryFunctions.encode('UNR' + ' ' + bsName + ' ' + str(bsTCPPort) + '\n')
-    server.sendMessage(csName, fullRequest, csPort)
+    udpserver.sendMessage(csName, fullRequest, csPort)
     
-    waitForMessage()
-
+    waitForCSMessage()
 
 # Handles the registry of the new BS 
 def register():
     # writes the request message
     fullRequest = AuxiliaryFunctions.encode('REG' + ' ' + bsName + ' ' + str(bsTCPPort) + '\n')
-    server.sendMessage(csName, fullRequest, csPort)
+    udpserver.sendMessage(csName, fullRequest, csPort)
 
-    waitForMessage()
+    # waitForCSMessage()
 
 # Handles the registry response from the CS
 def handleRegistryResponse(confirmation):
@@ -74,25 +121,28 @@ def handleDeregistryResponse(confirmation):
         print('deregistry not successfull')
     else:
         print('syntax error')
-        
 
-# Ensures that the BS is 'always on' and receives the CS and user requests and responses
-def waitForMessage():
-    # all possible messages
-    allRequests = {
-        'RGR': handleRegistryResponse,
-        'UAR': handleDeregistryResponse,
-        'LSU': registerUser
-    }
+# Confirmation of the user registration
+def handleUserRegistry(status):
+    fullResponse = AuxiliaryFunctions.encode('LUR ' + status + '\n')
+    udpserver.sendMessage(csName, fullResponse, csPort)    
+
+# Handles unexpected UDP protocol messages
+def handleUnexpectedUDPProtocolMessage():
+    fullResponse = AuxiliaryFunctions.encode('ERR\n')
+    udpserver.sendMessage(csName, fullResponse, csPort)
+
+# Receives the CS requests and responses
+def waitForCSMessage():
 
     # waits for a request
-    message, address = server.receiveMessage()
+    message, address = udpserver.receiveMessage()
     confirmation = AuxiliaryFunctions.decode(message).split()
 
     func = allRequests.get(confirmation[0])
 
     if func == None:
-        raise IOError('ERR')
+        handleUnexpectedUDPProtocolMessage()
     else:
         return func(confirmation[1:])
     
@@ -114,20 +164,36 @@ def getArguments(argv):
 
 def main(argv):
     try:
-        global server 
+        global udpserver 
+        global tcpserver
         global bsTCPPort
         global csName
         global csPort
+        global allRequests
+
+        allRequests = {
+            'RGR': handleRegistryResponse,
+            'UAR': handleDeregistryResponse,
+            'LSU': registerUser,
+            'AUT': authenticateUser
+        }
 
         bsTCPPort, csName, csPort = getArguments(argv)
-        server = UDPserver.UDPServer(bsName, bsUDPPort)
-        register()
-        waitForMessage()
+        #udpserver = UDPserver.UDPServer(bsName, bsUDPPort)
+        tcpserver = TCPserver.TCPServer('localhost', 5005)
+        tcpserver.establishConnection()
+        #register()
+        #while True: 
+        waitForUserMessage()
+        tcpserver.closeConnection()
+
     except KeyboardInterrupt:
         deregister()
+        udpserver.closeConnection() 
         print('BS service deregistered')
         sys.exit(1)
 
 
 if __name__ == "__main__":
     main(sys.argv[1:])
+    sys.exit(0)
