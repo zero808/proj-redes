@@ -20,6 +20,34 @@ userList = {}
 # User - BS #
 #############
 
+def fileBackup(fileData):
+    try:
+        directoryName = str(fileData[0])
+        numberOfFiles = int(fileData[1])
+
+        if len(fileData) != (numberOfFiles * 4 + 2):
+            handleFileBackup('NOK')
+
+        argCount = 2
+        for i in range(0, numberOfFiles):
+            fileName = str(fileData[argCount])
+            dateTime = str(fileData[argCount + 1])
+            fileSize = int(fileData[argCount + 2])
+            data = bytes(fileData[argCount + 3])
+
+            
+            backupFile = open(fileName, 'w', 0) #buffering = 0 cause it's a binary file
+            backupFile.write(data)
+            
+        handleFileBackup('OK')
+    except ValueError:
+        handleFileBackup('NOK')
+    except OSError as e:
+        handleFileBackup('NOK')
+        print('Could not create a file with name ', fileName, ' ', e)
+        sys.exit(1)
+
+
 # user authentication
 def authenticateUser(userData):
     try:
@@ -37,6 +65,10 @@ def authenticateUser(userData):
     except ValueError:
         # if the userName isn't an int
         handleUserAuthentication('NOK')
+
+def handleFileBackup(status):
+    fullResponse = AuxiliaryFunctions.encode('UPR ' + status + '\n')
+    tcpserver.sendMessage(fullResponse)
 
 # confirmation of the user authentication
 def handleUserAuthentication(status):
@@ -90,7 +122,7 @@ def registerUser(userData):
             userList[userName] = userPassword
             # if userList was updated correctly
             handleUserRegistry('OK')
-            print('user registered')
+            print('New user: ', userName)
 
     except ValueError:
         handleUserRegistry('ERR')
@@ -108,7 +140,7 @@ def register():
     # writes the request message
     fullRequest = AuxiliaryFunctions.encode('REG' + ' ' + bsName + ' ' + str(bsTCPPort) + '\n')
     udpserver.sendMessage(csName, fullRequest, csPort)
-
+    print('registou')
     # waitForCSMessage()
 
 # Handles the registry response from the CS
@@ -152,7 +184,6 @@ def waitForCSMessage():
         handleUnexpectedUDPProtocolMessage()
     else:
         return func(confirmation[1:])
-    
 
 # Reads the arguments from the command line
 def getArguments(argv):
@@ -182,7 +213,8 @@ def main(argv):
             'RGR': handleRegistryResponse,
             'UAR': handleDeregistryResponse,
             'LSU': registerUser,
-            'AUT': authenticateUser
+            'AUT': authenticateUser,
+            'UPL': uploadFile
         }
 
         bsTCPPort, csName, csPort = getArguments(argv)
@@ -206,6 +238,7 @@ def main(argv):
         else:
             udpserver = UDPserver.UDPServer(bsName, bsUDPPort)
             register()
+            
             while True:
                 waitForCSMessage()
             
