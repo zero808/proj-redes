@@ -85,7 +85,7 @@ def getDirContent(diri):
     import fileinput
     import datetime
 
-    currentPath = ''.join([os.getcwd(), '/', diri])
+    currentPath = ''.join([os.getcwd(), os.sep, diri])
     filesContent = {}
 
     #FIXME we do not want to read all the files, just the subset
@@ -96,7 +96,7 @@ def getDirContent(diri):
         #change directory to avoid having to build a string with
         #the absolute path to the file(s)
         os.chdir(diri)
-        for filename in os.listdir(os.curdir): #FIXME substitute
+        for filename in os.listdir(os.curdir):
             with open(filename, 'rb') as f:
                 #save the content of the file
                 fileContent = f.read()
@@ -107,7 +107,7 @@ def getDirContent(diri):
                 #associate a filename with all the relevant information
                 filesContent[filename] = (fileContent, fileSize, timestampToString(timestamp))
 
-        os.chdir('..') #go back
+        os.chdir(os.pardir) #go back
     except (OSError, FileNotFoundError, OverflowError) as err:
         print('OS error: {0}'.format(err))
 
