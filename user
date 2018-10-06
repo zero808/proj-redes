@@ -77,11 +77,7 @@ def handleDirlist(arg):
         printf('No directories to display')
 
 def timestampToString(ts):
-    #template =  "{0}.{1}.{2} {3}:{4}:{5}"
-    #TODO fix cases where the day/month/etc is < 10
-    #example January is 1 but should be 01
-    #out = template.format(ts.year, ts.month, ts.day, ts.hour, ts.minute, ts.second)
-    out = ts.strftime('%Y.%m.%d %H:%M:%s')
+    out = ts.strftime('%Y.%m.%d %H:%M:%S')
     return out
 
 def getDirContent(diri):
