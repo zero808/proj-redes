@@ -4,9 +4,9 @@ import socket
 
 class UDPClient(metaclass=ABCMeta):
 	
-	def __init__(self, UDP_HOST, UDP_PORT):
+	def __init__(self, UDP_IP, UDP_PORT):
 		self.UDP_PORT = UDP_PORT
-		self.UDP_IP = UDP_HOST
+		self.UDP_IP = UDP_IP
 		self.BUFFER_SIZE = 4096
 		
 		try:
@@ -17,10 +17,12 @@ class UDPClient(metaclass=ABCMeta):
 	
 	# return the reply from the server
 	def sendMessage(self, message):
+		message = str.encode(message)
 		message += b'\n'
-		print('Sent to', (self.UDP_IP, self.UDP_PORT), "is '", reply, "'")
+		print('Sent to', (self.UDP_IP, self.UDP_PORT), "is", message)
 		self.s.sendto(message, (self.UDP_IP, self.UDP_PORT))
 		
+		receivedMessage = b""
 		while True:
 			# receive (part of) message from the socket
 			try:
@@ -33,4 +35,17 @@ class UDPClient(metaclass=ABCMeta):
 			# if data has \n, it means that is necessary interpret the message
 			if b'\n' in data:
 				print('From', addr, 'is', receivedMessage)
+				
+				receivedMessage = receivedMessage.decode('UTF-8')
+				# to verify if data received ends with \n
+				dataArray = receivedMessage.split("\n")
+				if len(dataArray) != 2 or dataArray[1] != '':
+					self.s.sendto(b'ERR', (self.UDP_IP, self.UDP_PORT))
+					return "ERR"
+				
+				# to verify if data has more than one space between words
+				if "" in receivedMessage.split(" "):
+					self.s.sendto(b'ERR', (self.UDP_IP, self.UDP_PORT))
+					return "ERR"
+				
 				return receivedMessage

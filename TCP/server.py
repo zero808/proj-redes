@@ -1,13 +1,16 @@
 from abc import ABCMeta, abstractmethod
 import sys
+import os
 import socket
 
 class TCPServer(metaclass=ABCMeta):
-
+	
 	def __init__(self, TCP_IP, TCP_PORT):
 		self.TCP_PORT = TCP_PORT
 		self.TCP_IP = TCP_IP
 		self.BUFFER_SIZE = 4096
+		self.currentUser = None
+		self.currentPassword = None
 		
 		try:
 			self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -16,48 +19,92 @@ class TCPServer(metaclass=ABCMeta):
 		except socket.gaierror as msg:
 			raise IOError('Bind was not successful')
 		except socket.error as msg:
-			raise IOError('Something went wrong in the process of socket creation')		
+			raise IOError('Something went wrong in the process of socket creation')
 
-	def establishConnection(self):
-		self.conn, self.addr = self.s.accept()
-
-	def run(self):
-
-		print('Connection address:', self.addr)
+	def run(self):		
+		while True:
+			conn, addr = self.s.accept()
+			
+			pidChild = os.fork()
+			if pidChild == 0:
+				self.newConnection(conn, addr)
+				sys.exit(0)
+			elif pidChild == -1:
+				# will try again
+				pidChild = os.fork()
+				if pidChild == 0:
+					self.newConnection(conn, addr)
+					sys.exit(0)
+	
+	@abstractmethod
+	def interpretMessage(self, message):
+		pass
+	
+	def sendReply(self, conn, reply):
+		reply += b'\n'
+		conn.send(reply)
+		return reply
+	
+	def newConnection(self, conn, addr):
+		print('Connection address:', addr)
 		
 		# will have the final message to interpret
 		receivedMessage = b''
 		while True:
 			# receive (part of) message from the socket
+			data = b''
 			try:
-				data = self.conn.recv(self.BUFFER_SIZE)
+				data = conn.recv(self.BUFFER_SIZE)
 			except:
-				raise IOError('recv failed')
+				try:
+					self.sendReply(conn, str.encode("ERR"))
+				except:
+					print("Cannot reach " + str(addr))
+				finally:
+					break
 			
 			receivedMessage += data
 			
 			if receivedMessage == b'':
-				print("Close connection with", self.addr)
+				print("Close connection with", addr)
 				break
 			
 			# if data has \n, it means that is necessary interpret the message
 			if b'\n' in data:
-				print('From', self.addr, 'is', receivedMessage)
+				print('From', addr, 'is', receivedMessage)
+				receivedMessage = receivedMessage.decode('UTF-8')
+				# to verify if data received ends with \n
+				dataArray = receivedMessage.split("\n")
+				if len(dataArray) != 2 or dataArray[1] != '':
+					self.sendReply(conn, str.encode('ERR'))
+					break
+				
+				# to verify if data has more than one space between words
+				if "" in receivedMessage.split(" "):
+					self.sendReply(conn, str.encode('ERR'))
+					break
+				
+				if receivedMessage[:3] == "AUT" and self.currentUser is not None:
+					self.sendReply(conn, str.encode('ERR'))
+					break					
 				
 				try:
 					reply = str.encode(self.interpretMessage(receivedMessage))				
 				except IOError as msg:
 					reply = str.encode(str(msg))
-				except:
-					raise IOError('ERR')
+				except Exception as msg:
+					reply = str.encode("ERR")
 				
-				receivedMessage = b''
-				reply += b'\n'
-				self.conn.send(reply)
-				print('Sent to', self.addr, "is '", reply, "'")
+				try:
+					reply = self.sendReply(conn, reply)
+					print('Sent to', addr, "is", reply)
+					if reply == str.encode("ERR"):
+						break
+				except:
+					print("Cannot reach " + str(addr))
+					break
+				
+				receivedMessage = b''				
 		
-		self.conn.close()
-	
-	@abstractmethod
-	def interpretMessage(self, message):
-		pass
+		conn.close()
+		sys.exit(0)
