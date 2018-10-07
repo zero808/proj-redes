@@ -113,6 +113,54 @@ def getDirContent(diri):
 
     return filesContent
 
+#backup
+def backupCSRequest(dirname, N, dirBytes):
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.connect(CS)
+            if loginAux(s) == LOGIN_SUCCESS:
+
+                ret = call(s, makeProtocolString("BCK", dirname, str(N), dirBytes))
+                if EOF in ret:
+                    print("Cannot answer the request")
+                elif ERROR in ret:
+                    print("Malformed request")
+                else:
+                    return ret
+
+            elif ERROR in ret:
+                print("Malformed request")
+            else:
+                print("Error: Could not backup the directory {}".format(dirname))
+    except ConnectionRefusedError:
+        print("Error in connecting to socket on port: ", CS[1])
+
+def backupBSRequest(dirname, N, dirBytes):
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.connect(BS)
+            if loginAux(s) == LOGIN_SUCCESS:
+
+                ret = call(s, makeProtocolString("UPL", dirname, str(N), dirBytes))
+                if EOF in ret:
+                    print("Cannot answer the request")
+                elif ERROR in ret:
+                    print("Malformed request")
+                elif ret == b'UPR OK'
+                    print("Backup of directory {} successful".format(dirname))
+                else:
+                    return ret
+
+            elif ERROR in ret:
+                print("Malformed request")
+            else:
+                print("Error: Could not backup the directory {}".format(dirname))
+    except ConnectionRefusedError:
+        print("Error in connecting to socket on port: ", CS[1])
+
+def processCSReply(message, fileContents):
+    pass
+
 def stringifyDirlistCS(filesContent):
     result = []
     for item in filesContent.items():
@@ -176,8 +224,9 @@ def call(socket, message ):
             # we got the final '\n' so this was the last message
             if data.endswith(b'\n'):
                 break
-    except ConnectionResetError:
-        print("erro")
+    except ConnectionResetError as err:
+        print('TCP error: {0}'.format(err))
+#        print("erro")
 
     ret = b''.join(chunks).strip()
 
@@ -246,29 +295,13 @@ def backup(args):
     dirFiles = getDirContent(dirname)
     dirBytes = stringifyDirlistCS(dirFiles)
     N = len(dirFiles.keys())
-    try:
-        #connect to the CS
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.connect(CS)
-            if loginAux(s) == LOGIN_SUCCESS:
-                ret = call(s, makeProtocolString("BCK", str(N), dirBytes))
-                if ret.startswith(b'BKR'):
-                    print("sucesso")
-                    print(ret)
-                elif ERROR in ret:
-                    print("Malformed request")
-            elif ERROR in ret:
-                print("Malformed request")
-            else:
-                print("Error: Could not backup the directory {}".format(dir))
-    except ConnectionRefusedError:
-        print("Error in connecting to socket on port: ", CS[1])
-    #login to the CS
+
     #send the list of files
+    ret = backupCSRequest(dirname, N, dirBytes)
     #save the subset of the files that will actually be transmitted
-    #login to BS
+    dirBytes = processCSReply(ret, dirFiles)
     #send the files
-#ver  print(os.stat(f.filename()))
+    backupBSRequest(dirname, N, dirBytes)
 
 def restore(args):
     "Restores the directory dir"
@@ -360,6 +393,7 @@ def exit(args):
 LOGIN_SUCCESS = b'AUR OK'
 LOGIN_FAIL = b'AUR NOK'
 ERROR = b'ERR'
+EOF = b'EOF'
 NOK = "NOK"
 NEW = "NEW"
 
