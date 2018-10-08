@@ -4,13 +4,15 @@ import sys
 import argparse
 import os
 import shutil
+import datetime
+import signal
 import UDPserver
 import TCPserver
 import AuxiliaryFunctions
 
 # Global Variables
 
-bsName = socket.gethostbyname(socket.gethostname())
+bsName = socket.gethostbyname('localhost')
 bsUDPPort = 9997
 
 userList = {} 
@@ -36,19 +38,26 @@ def uploadFile(fileData):
             argCount = 2
             for i in range(0, numberOfFiles):
                 fileName = str(fileData[argCount])
-                fileDate = str(fileData[argCount + 1])
-                fileTime = str(fileData[argCount + 2])
+
+                fileDateString = str(fileData[argCount + 1])
+                fileDate = AuxiliaryFunctions.dateEpoch(fileDateString)
+                
+                fileTimeString = str(fileData[argCount + 2])
+                fileTime = AuxiliaryFunctions.timeEpoch(fileTimeString)
+                
                 fileSize = int(fileData[argCount + 3])
                 data = fileData[argCount + 4]
-
+                
                 backupFile = open(fileName, 'w')
                 backupFile.write(data)
+                
+                os.utime(fileName, (fileDate + fileTime, fileDate + fileTime))
                 shutil.move(fileName, directoryName) 
 
                 print(fileName, fileSize, 'Bytes received', end='\n')
                 argCount += 5
 
-            handleFileBackup('OK')
+            handleFileBackup('OK') 
     except ValueError:
         handleFileBackup('NOK')
     except OSError as e:
@@ -74,6 +83,7 @@ def authenticateUser(userData):
         # if the userName isn't an int
         handleUserAuthentication('NOK')
 
+# confirmation of the file backup
 def handleFileBackup(status):
     fullResponse = AuxiliaryFunctions.encode('UPR ' + status + '\n')
     tcpserver.sendMessage(fullResponse)
@@ -95,17 +105,11 @@ def waitForUserMessage():
     message = tcpserver.receiveMessage()
     confirmation = AuxiliaryFunctions.decode(message).split()
 
-    print(confirmation)
-
     func = allRequests.get(confirmation[0])
 
-    print(func)
     if func == None:
-        print('ups')
         handleUnexpectedTCPProtocolMessage()
     else:
-        print('entrou aqui')
-        print('argumentos: ', confirmation[1:])
         return func(confirmation[1:])
 
 
@@ -113,6 +117,26 @@ def waitForUserMessage():
 #############
 #  CS - BS  #
 #############
+
+# deletes a directory from an user
+def deleteDirectory(dirData):
+    try:
+        userName = int(dirData[0])
+        dirName = str(dirData[1])
+
+        if len(dirData) != 2:
+            handleDirDeletion('NOK')
+        elif userName not in userList:
+            handleDirDeletion('NOK')
+        else:
+            shutil.rmtree(dirName)
+            handleDirDeletion('OK')
+
+    except ValueError:
+        handleDirDeletion('NOK')
+    except OSError as e:
+        handleDirDeletion('NOK')
+        sys.exit(1)
 
 # Adds a new user to the userList
 def registerUser(userData):
@@ -151,6 +175,11 @@ def register():
     udpserver.sendMessage(csName, fullRequest, csPort)
     print('registou')
     # waitForCSMessage()
+
+# confirmation of the user directory deletion
+def handleDirDeletion(status):
+    fullResponse = AuxiliaryFunctions.encode('DBR ' + status + '\n')
+    udpserver.sendMessage(csName, fullResponse, csPort)
 
 # Handles the registry response from the CS
 def handleRegistryResponse(confirmation):
@@ -194,6 +223,8 @@ def waitForCSMessage():
     else:
         return func(confirmation[1:])
 
+
+
 # Reads the arguments from the command line
 def getArguments(argv):
     parser = argparse.ArgumentParser(argv)
@@ -223,7 +254,8 @@ def main(argv):
             'UAR': handleDeregistryResponse,
             'LSU': registerUser,
             'AUT': authenticateUser,
-            'UPL': uploadFile
+            'UPL': uploadFile,
+            'DLB': deleteDirectory
         }
 
         bsTCPPort, csName, csPort = getArguments(argv)
