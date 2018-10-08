@@ -51,7 +51,7 @@ def handleFilelist(arg, directory):
     status, BSip, BSport, N, filelist = tokens
     N = int(N)
     #see the pattern in the specification
-    ex = '\w*\s\d{2}\.\d{2}\.\d{4}\s\d{2}\:\d{2}\:\d{2}\s\d*'
+    ex = '\w*\.\w*\s\d{2}\.\d{2}\.\d{4}\s\d{2}\:\d{2}\:\d{2}\s\d*'
     files = f(ex, filelist)
 
     if status == 'LFD' and N > 0 and len(files) == N:
