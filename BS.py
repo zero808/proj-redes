@@ -3,6 +3,7 @@ import socket
 import sys
 import argparse
 import os
+import shutil
 import UDPserver
 import TCPserver
 import AuxiliaryFunctions
@@ -20,33 +21,40 @@ userList = {}
 # User - BS #
 #############
 
-def fileBackup(fileData):
+# receives the files from the user
+def uploadFile(fileData):
     try:
         directoryName = str(fileData[0])
         numberOfFiles = int(fileData[1])
 
-        if len(fileData) != (numberOfFiles * 4 + 2):
+        if len(fileData) != (numberOfFiles * 5 + 2):
             handleFileBackup('NOK')
+        
+        else:
+            os.mkdir(directoryName)
+            print(directoryName,':', end=' ')
+            argCount = 2
+            for i in range(0, numberOfFiles):
+                fileName = str(fileData[argCount])
+                fileDate = str(fileData[argCount + 1])
+                fileTime = str(fileData[argCount + 2])
+                fileSize = int(fileData[argCount + 3])
+                data = fileData[argCount + 4]
 
-        argCount = 2
-        for i in range(0, numberOfFiles):
-            fileName = str(fileData[argCount])
-            dateTime = str(fileData[argCount + 1])
-            fileSize = int(fileData[argCount + 2])
-            data = bytes(fileData[argCount + 3])
+                backupFile = open(fileName, 'w')
+                backupFile.write(data)
+                shutil.move(fileName, directoryName) 
 
-            
-            backupFile = open(fileName, 'w', 0) #buffering = 0 cause it's a binary file
-            backupFile.write(data)
-            
-        handleFileBackup('OK')
+                print(fileName, fileSize, 'Bytes received', end='\n')
+                argCount += 5
+
+            handleFileBackup('OK')
     except ValueError:
         handleFileBackup('NOK')
     except OSError as e:
         handleFileBackup('NOK')
-        print('Could not create a file with name ', fileName, ' ', e)
+        print('Error handling files or directories', e)
         sys.exit(1)
-
 
 # user authentication
 def authenticateUser(userData):
@@ -97,6 +105,7 @@ def waitForUserMessage():
         handleUnexpectedTCPProtocolMessage()
     else:
         print('entrou aqui')
+        print('argumentos: ', confirmation[1:])
         return func(confirmation[1:])
 
 

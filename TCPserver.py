@@ -26,9 +26,8 @@ class TCPServer:
 
     def receiveMessage(self):
         try:
+            
             data = self.connection.recv(BUFFER_SIZE)
-
-            if not data: return None
 
             fullMessage = b''
             while True: # messages will end with \n
