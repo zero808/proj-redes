@@ -60,7 +60,7 @@ def handleFilelist(arg, directory):
             print(filename)
             #print('\t- {}'.format(filename))
     else:
-        printf('No directories to display')
+        print('No directories to display')
 
 def handleDirlist(arg):
     tokens = arg.decode('utf8').split(' ')
@@ -74,10 +74,10 @@ def handleDirlist(arg):
         for directory in tokens[2:]:
             print('\t- {}'.format(directory))
     else:
-        printf('No directories to display')
+        print('No directories to display')
 
 def timestampToString(ts):
-    out = ts.strftime('%Y.%m.%d %H:%M:%S')
+    out = ts.strftime('%d.%m.%Y %H:%M:%S')
     return out
 
 def getDirContent(diri):
@@ -146,7 +146,7 @@ def backupBSRequest(dirname, N, dirBytes):
                     print("Cannot answer the request")
                 elif ERROR in ret:
                     print("Malformed request")
-                elif ret == b'UPR OK'
+                elif ret == b'UPR OK':
                     print("Backup of directory {} successful".format(dirname))
                 else:
                     return ret
@@ -159,7 +159,24 @@ def backupBSRequest(dirname, N, dirBytes):
         print("Error in connecting to socket on port: ", CS[1])
 
 def processCSReply(message, fileContents):
-    pass
+    from re import findall as f
+
+    separator = '\s'
+    ip = '\\d*\\.\\d*\\.\\d*\\.\\d*\\s\\d*'
+    #filename = '\\w*\\.\\w*|\\w*' #returns a list???
+    filename = '\\w*\\.\\w*|\\w*'
+    filecount = '\d*'
+    datetime = '\d{2}\.\d{2}\.\d{4}\s\d{2}\:\d{2}\:\d{2}'
+    size = '\d*'
+    fileData = '\w*'
+    mandatory = separator.join([ip, filecount])
+
+    results = f(mandatory, message)
+    tokens = results[0].split(' ')
+    
+    global BS
+    BS = (tokens[0], tokens[1])
+    N = tokens[2]
 
 def stringifyDirlistCS(filesContent):
     result = []
@@ -418,7 +435,7 @@ password = ""
 # Central Server location
 CS = ()
 # Backup Server location
-#BS = ()
+BS = ()
 ############################################
 
 def main():
