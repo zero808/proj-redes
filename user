@@ -40,9 +40,6 @@ def makeProtocolString(*command):
     ret =  ' '.join(command)
     return ret + '\n'
 
-def printDirContent(arg, dirname):
-    pass
-
 def handleFilelist(arg, directory):
     from re import findall as f
 
@@ -51,7 +48,7 @@ def handleFilelist(arg, directory):
     status, BSip, BSport, N, filelist = tokens
     N = int(N)
     #see the pattern in the specification
-    ex = '\w*\s\d{2}\.\d{2}\.\d{4}\s\d{2}\:\d{2}\:\d{2}\s\d*'
+    ex = '\w*\.\w*\s\d{2}\.\d{2}\.\d{4}\s\d{2}\:\d{2}\:\d{2}\s\d*'
     files = f(ex, filelist)
 
     if status == 'LFD' and N > 0 and len(files) == N:
@@ -140,8 +137,9 @@ def backupBSRequest(dirname, N, dirBytes):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect(BS)
             if loginAux(s) == LOGIN_SUCCESS:
-
-                ret = call(s, makeProtocolString("UPL", dirname, str(N), dirBytes))
+                
+                t = b' '.join([b'UPL', dirname.encode(), bytes(str(N), 'utf-8'), dirBytes])
+                ret = call(s, t)
                 if EOF in ret:
                     print("Cannot answer the request")
                 elif ERROR in ret:
@@ -151,8 +149,8 @@ def backupBSRequest(dirname, N, dirBytes):
                 else:
                     return ret
 
-            elif ERROR in ret:
-                print("Malformed request")
+            #elif ERROR in ret:
+            #    print("Malformed request")
             else:
                 print("Error: Could not backup the directory {}".format(dirname))
     except ConnectionRefusedError:
@@ -160,23 +158,48 @@ def backupBSRequest(dirname, N, dirBytes):
 
 def processCSReply(message, fileContents):
     from re import findall as f
+    
+    message_str = message.decode()
 
     separator = '\s'
     ip = '\\d*\\.\\d*\\.\\d*\\.\\d*\\s\\d*'
     #filename = '\\w*\\.\\w*|\\w*' #returns a list???
-    filename = '\\w*\\.\\w*|\\w*'
+    filename = '\\w*\\.\\w*'
     filecount = '\d*'
     datetime = '\d{2}\.\d{2}\.\d{4}\s\d{2}\:\d{2}\:\d{2}'
     size = '\d*'
-    fileData = '\w*'
+    #fileData = '\w*'
     mandatory = separator.join([ip, filecount])
 
-    results = f(mandatory, message)
+    results = f(mandatory, message_str)
     tokens = results[0].split(' ')
     
     global BS
-    BS = (tokens[0], tokens[1])
-    N = tokens[2]
+    BS = (socket.gethostbyname(tokens[0]), int(tokens[1]))
+    ret = tokens[2]
+    N = int(ret)
+    result = []
+
+    if N > 0:
+        # 5 = 'BKR' + 2 * ' '
+        files = f(separator.join([filename, datetime, size]), message_str[5 + len(results[0]):])
+        if len(files) == N:
+            aux = N
+            for item in files:
+                fname = item.split(' ')[0]
+                #to avoid mixing strs and bytes, encode it right away
+                result.append(item.encode())
+                #we need an extra space, to separate the conntents
+                result.append(b' ')
+                #search for the entry for this file and get it's data
+                result.append(fileContents[fname][0])
+                if aux > 1:
+                    #we need an extra space, to separate files
+                    result.append(b' ')
+                    aux -= 1
+
+    result.append(b'\n')
+    return b''.join(result)
 
 def stringifyDirlistCS(filesContent):
     result = []
@@ -227,7 +250,12 @@ def call(socket, message ):
     ret = NOK
 
     #Send our request (after converting it to bytes)
-    socket.sendall(str.encode(message))
+    if isinstance(message, str):
+        payload = message.encode()
+    else:
+        payload = message
+
+    socket.sendall(payload)
 
     try:
         while True:
