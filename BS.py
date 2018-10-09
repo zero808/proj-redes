@@ -16,14 +16,20 @@ bsName = socket.gethostbyname(socket.gethostname())
 bsUDPPort = 9997
 parentPid = os.getpid() #parent process id
 
-userList = {86415:'qrqrqrqr'} 
+userList = {} 
 
-# child process kill
+# SIGNAL HANDLERS
+
+# Process kill
 def handleProcessKill(sig, frame):
-    sys.exit(1)
+     if os.getpid() == parentPid:
+        endConnection()
+        sys.exit(1)
+    else:
+        deregister()
+        sys.exit(1)
 
-
-# ctrl + c - deregisters the bs and closes the connections
+# Ctrl + c - deregisters the bs and closes the connections
 def handleKeyboardInterruption(sig, frame):
     if os.getpid() == parentPid:
         endConnection()
@@ -33,13 +39,14 @@ def handleKeyboardInterruption(sig, frame):
         sys.exit(1)
 
 
-# Main Functions
+# MAIN FUNCTIONS
 
-#############
-# User - BS #
-#############
+###################
+#    User - BS   #
+# (TCP Protocol) #
+##################
 
-# closes the tco connection
+# Closes the TCP connection
 def endConnection():
     tcpserver.closeConnection()
 
@@ -103,12 +110,12 @@ def authenticateUser(userData):
         # if the userName isn't an int
         handleUserAuthentication('NOK')
 
-# confirmation of the file backup
+# Confirmation of the file backup
 def handleFileBackup(status):
     fullResponse = AuxiliaryFunctions.encode('UPR ' + status + '\n')
     tcpserver.sendMessage(fullResponse)
 
-# confirmation of the user authentication
+# Confirmation of the user authentication
 def handleUserAuthentication(status):
     fullResponse = AuxiliaryFunctions.encode('AUR ' + status + '\n')
     tcpserver.sendMessage(fullResponse)
@@ -134,11 +141,19 @@ def waitForUserMessage():
 
 
 
-#############
-#  CS - BS  #
-#############
+##################
+#     CS - BS    #
+# (UDP Protocol) #
+##################
 
-# deletes a directory from an user
+# Sends the list of files in dirName to the CS
+def sendFileList(dirName):
+    with os.scandir(dirName) as it:
+        for entry in it:
+            if not entry.name.startswith('.') and entry.is_file(): 
+                print(entry.name)
+
+# Deletes a directory from an user
 def deleteDirectory(dirData):
     try:
         userName = int(dirData[0])
@@ -162,15 +177,14 @@ def deleteDirectory(dirData):
 def registerUser(userData):
     try:
         userName = int(userData[0])
-        userPassword = userData[1]
+        userPassword = str(userData[1])
 
         if len(userData) != 2:
+            # syntax error
             handleUserRegistry('ERR')
-            # raise IOError("syntax error")
         elif userName in userList and userList.get(userName) == userPassword:
             # if the userList was not updated
             handleUserRegistry('NOK')
-            print('list not updated')
         else:
             userList[userName] = userPassword
             # if userList was updated correctly
@@ -194,8 +208,25 @@ def register():
     fullRequest = AuxiliaryFunctions.encode('REG' + ' ' + bsName + ' ' + str(bsTCPPort) + '\n')
     udpserver.sendMessage(csName, fullRequest, csPort)
 
+# Handles the CS request to list the files in a dir
+def handleListFilesRequest(dirData):
+    try:
+        userName = int(dirData[0])
+        dirName = str(dirData[1])
 
-# confirmation of the user directory deletion
+        if len(dirData) != 2:
+            print('syntax error')
+        elif userName not in userList or (userName in userList and userList.get(userName) != userPassword):
+            # if the user doesn't exist or the password is wrong
+            print('user error')
+        else:
+            # calls the function responsible for sending the file list
+            sendFileList(dirName)
+        
+    except ValueError:
+        print('syntax error')
+
+# Confirmation of the user directory deletion
 def handleDirDeletion(status):
     fullResponse = AuxiliaryFunctions.encode('DBR ' + status + '\n')
     udpserver.sendMessage(csName, fullResponse, csPort)
@@ -262,15 +293,10 @@ def getArguments(argv):
     return (int(bsTCPPort), csName, int(csPort))
 
 def main(argv):
-    global bsTCPPort
-    global csName
-    global csPort
+    global bsTCPPort, csName, csPort
     global allRequests
     global pidUDPserver
-    global udpserver 
-    global tcpserver
-
-    print(bsName)
+    global udpserver, tcpserver
 
     allRequests = {
         'RGR': handleRegistryResponse,
@@ -278,7 +304,8 @@ def main(argv):
         'LSU': registerUser,
         'AUT': authenticateUser,
         'UPL': uploadFile,
-        'DLB': deleteDirectory
+        'DLB': deleteDirectory,
+        'LSF': handleListFilesRequest
     }
 
     bsTCPPort, csName, csPort = getArguments(argv)
@@ -291,7 +318,6 @@ def main(argv):
     
     if pidUDPserver == 0:
         # child process (UDP)
-        signal.signal(signal.SIGINT, handleKeyboardInterruption)
         udpserver = UDPserver.UDPServer(bsName, bsUDPPort)
         register()
 
@@ -301,7 +327,6 @@ def main(argv):
     
     else:
         # parent process (TCP)
-        signal.signal(signal.SIGINT, handleKeyboardInterruption)
         tcpserver = TCPserver.TCPServer(bsName, bsTCPPort)
         tcpserver.establishConnection()
         
@@ -312,6 +337,7 @@ def main(argv):
 
 
 if __name__ == "__main__":
+    signal.signal(signal.SIGINT, handleKeyboardInterruption)
     signal.signal(signal.SIGTERM, handleProcessKill)
     main(sys.argv[1:])
     sys.exit(0)
