@@ -12,16 +12,36 @@ import AuxiliaryFunctions
 
 # Global Variables
 
-bsName = socket.gethostbyname('localhost')
+bsName = socket.gethostbyname(socket.gethostname())
 bsUDPPort = 9997
+parentPid = os.getpid() #parent process id
 
-userList = {} 
+userList = {86415:'qrqrqrqr'} 
+
+# child process kill
+def handleProcessKill(sig, frame):
+    sys.exit(1)
+
+
+# ctrl + c - deregisters the bs and closes the connections
+def handleKeyboardInterruption(sig, frame):
+    if os.getpid() == parentPid:
+        endConnection()
+        sys.exit(1)
+    else:
+        deregister()
+        sys.exit(1)
+
 
 # Main Functions
 
 #############
 # User - BS #
 #############
+
+# closes the tco connection
+def endConnection():
+    tcpserver.closeConnection()
 
 # receives the files from the user
 def uploadFile(fileData):
@@ -165,21 +185,21 @@ def deregister():
     # writes the request message
     fullRequest = AuxiliaryFunctions.encode('UNR' + ' ' + bsName + ' ' + str(bsTCPPort) + '\n')
     udpserver.sendMessage(csName, fullRequest, csPort)
-    udpserver.closeConnection() 
     waitForCSMessage()
+    udpserver.closeConnection() 
 
 # Handles the registry of the new BS 
 def register():
     # writes the request message
     fullRequest = AuxiliaryFunctions.encode('REG' + ' ' + bsName + ' ' + str(bsTCPPort) + '\n')
     udpserver.sendMessage(csName, fullRequest, csPort)
-    print('registou')
-    # waitForCSMessage()
+
 
 # confirmation of the user directory deletion
 def handleDirDeletion(status):
     fullResponse = AuxiliaryFunctions.encode('DBR ' + status + '\n')
     udpserver.sendMessage(csName, fullResponse, csPort)
+    #udpserver.sendMessage('192.168.1.65', fullResponse, 9995)
 
 # Handles the registry response from the CS
 def handleRegistryResponse(confirmation):
@@ -217,6 +237,7 @@ def waitForCSMessage():
     confirmation = AuxiliaryFunctions.decode(message).split()
 
     func = allRequests.get(confirmation[0])
+    print(func)
 
     if func == None:
         handleUnexpectedUDPProtocolMessage()
@@ -241,61 +262,56 @@ def getArguments(argv):
     return (int(bsTCPPort), csName, int(csPort))
 
 def main(argv):
-    try:
-        global udpserver 
-        global tcpserver
-        global bsTCPPort
-        global csName
-        global csPort
-        global allRequests
+    global bsTCPPort
+    global csName
+    global csPort
+    global allRequests
+    global pidUDPserver
+    global udpserver 
+    global tcpserver
 
-        allRequests = {
-            'RGR': handleRegistryResponse,
-            'UAR': handleDeregistryResponse,
-            'LSU': registerUser,
-            'AUT': authenticateUser,
-            'UPL': uploadFile,
-            'DLB': deleteDirectory
-        }
+    print(bsName)
 
-        bsTCPPort, csName, csPort = getArguments(argv)
+    allRequests = {
+        'RGR': handleRegistryResponse,
+        'UAR': handleDeregistryResponse,
+        'LSU': registerUser,
+        'AUT': authenticateUser,
+        'UPL': uploadFile,
+        'DLB': deleteDirectory
+    }
 
-        try: 
-            pidTCPserver = os.fork()
-        except OSError as e:
-            print('Could not create a child process')
-            sys.exit(1)
+    bsTCPPort, csName, csPort = getArguments(argv)
+
+    try: 
+        pidUDPserver = os.fork()
+    except OSError as e:
+        print('Could not create a child process')
+        sys.exit(1)
+    
+    if pidUDPserver == 0:
+        # child process (UDP)
+        signal.signal(signal.SIGINT, handleKeyboardInterruption)
+        udpserver = UDPserver.UDPServer(bsName, bsUDPPort)
+        register()
+
+        while True:
+            waitForCSMessage()
         
-        if pidTCPserver == 0:
-            print(bsName, bsTCPPort)
-            tcpserver = TCPserver.TCPServer(bsName, bsTCPPort)
-            tcpserver.establishConnection()
-
-            while True:
-                waitForUserMessage()
-            
-            tcpserver.closeConnection()
+    
+    else:
+        # parent process (TCP)
+        signal.signal(signal.SIGINT, handleKeyboardInterruption)
+        tcpserver = TCPserver.TCPServer(bsName, bsTCPPort)
+        tcpserver.establishConnection()
         
-        else:
-            udpserver = UDPserver.UDPServer(bsName, bsUDPPort)
-            register()
-            
-            while True:
-                waitForCSMessage()
-            
-            udpserver.closeConnection()
-        
-        try:
-            pid, status = os.waitpid(pidTCPserver, 0)
-        except OSError as e:
-            print('Child process did not complete successfully')
-            sys.exit(1)
+        while True:
+            waitForUserMessage()
 
-    except KeyboardInterrupt:
-        deregister()
-        print('BS service deregistered')
+
 
 
 if __name__ == "__main__":
+    signal.signal(signal.SIGTERM, handleProcessKill)
     main(sys.argv[1:])
     sys.exit(0)

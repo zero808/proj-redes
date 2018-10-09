@@ -51,8 +51,12 @@ class TCPServer:
             sys.exit(1)
 
     def closeConnection(self):
-        self.connection.close()
-        self.sock.close()
+        try:
+            self.connection.close()
+            self.sock.close()
+        except socket.error as e:
+            print('error on close:', e)
+            sys.exit(1)
 
 
 # Global Variables
