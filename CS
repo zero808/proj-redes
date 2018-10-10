@@ -7,6 +7,7 @@ import signal
 import socket
 import pickle
 from random import randint
+from pathlib import Path
 
 from TCP import server as TCPServer
 from UDP import server as UDPServer
@@ -108,6 +109,7 @@ class serverTCP(TCPServer.TCPServer):
 		if isUser and correctPassword:
 			self.currentUser = user
 			self.currentPassword = password
+			print("User: " + str(user))
 			return "AUR OK"
 		elif isUser:
 			return "AUR NOK"
@@ -119,6 +121,7 @@ class serverTCP(TCPServer.TCPServer):
 			setStuffToFile("CSUsers", users)
 			self.currentUser = user
 			self.currentPassword = password
+			print("New user: " + str(user))
 			return "AUR NEW"
 	
 	def deleteUser(self, args):
@@ -131,10 +134,11 @@ class serverTCP(TCPServer.TCPServer):
 		
 		users.pop(self.currentUser, None)
 		setStuffToFile("CSUsers", users)
+		print("   Delete user: " + str(user))
 		
 		return "DLR OK"
 		
-	def doBackup(self, args):
+	def doBackup(self, args):		
 		if not self.existsUser(self.currentUser):
 			raise IOError("ERR")
 		
@@ -186,6 +190,8 @@ class serverTCP(TCPServer.TCPServer):
 		
 		backupServers = getStuffFromFile("backupServers")
 		
+		print("   BCK " + dir + " of " + str(self.currentUser))
+		
 		# if the given dir is not saved
 		if not users[self.currentUser]['dirs'] or dir not in users[self.currentUser]['dirs'].keys() or users[self.currentUser]['dirs'][dir]['BS'] not in backupServers:
 						
@@ -227,12 +233,14 @@ class serverTCP(TCPServer.TCPServer):
 		return stringToReturn
 		
 		
-	def listDirBackedUp(self, args):
+	def listDirBackedUp(self, args):		
 		if not self.existsUser(self.currentUser):
 			raise IOError("ERR")
 		
 		if len(args) != 0:
 			raise IOError("ERR")
+		
+		print("   LDR of user")
 		
 		users = getStuffFromFile("CSUsers")
 		backupServers = getStuffFromFile("backupServers")
@@ -256,6 +264,8 @@ class serverTCP(TCPServer.TCPServer):
 		
 		if args[0] not in users[self.currentUser]['dirs']:
 			return "LFD NOK"
+		
+		print("   LFD of " + str(args[0]))
 		
 		bs = users[self.currentUser]['dirs'][args[0]]['BS']
 		
@@ -288,11 +298,13 @@ class serverTCP(TCPServer.TCPServer):
 		
 		if args[0] not in users[self.currentUser]['dirs']:
 			return "RSR EOF"
-		
+				
 		bs = users[self.currentUser]['dirs'][args[0]]['BS']
-		
+				
 		if bs not in backupServers:
 			raise IOError("RSR EOF")
+		
+		print("   RST of " + args[0] + " from " + bs['IPBS'] + " " + bs['portBS'])
 		
 		return "RSR " + bs['IPBS'] + " " + str(bs['portBS'])
 	
@@ -313,6 +325,8 @@ class serverTCP(TCPServer.TCPServer):
 		
 		if bs not in backupServers:
 			raise IOError("DDR NOK")
+		
+		print("   DEL " + dir + " from " + bs['IPBS'] + " " + bs['portBS'])
 		
 		client_UDP = clientUDP(bs)
 		try:
@@ -375,6 +389,8 @@ class serverUDP(UDPServer.UDPServer):
 		if bs not in backupServers:
 			backupServers.append(bs)
 			setStuffToFile("backupServers", backupServers)
+			
+			print("+BS:", str(args[0]), str(args[1]))
 			return "RGR OK"
 		else:
 			return "RGR NOK"
@@ -394,6 +410,8 @@ class serverUDP(UDPServer.UDPServer):
 		if bs in backupServers:
 			backupServers.remove(bs)
 			setStuffToFile("backupServers", backupServers)
+			
+			print("-BS:", str(args[0]), str(args[1]))
 			return "UAR OK"
 		else:
 			return "UAR NOK"
@@ -439,6 +457,8 @@ class clientUDP(UDPClient.UDPClient):
 		except ValueError:
 			raise IOError("LFD ERR")
 		
+		print("   LSF " + dir + " from " + bs['IPBS'] + " " + bs['portBS'])
+		
 		if reply[0] == 'LFD' and (len(reply) - 2) % 4 == 0 and (len(reply) - 2) / 4 == reply[1]:
 			files = []
 			for i in range(2, reply[1] * 4 + 2, 4):
@@ -460,6 +480,8 @@ class clientUDP(UDPClient.UDPClient):
 		if not isinstance(password, str):
 			raise IOError("LSU ERR")
 		
+		print("   LSU " + str(self.currentUser) + " to " + bs['IPBS'] + " " + bs['portBS'])
+		
 		reply = self.sendMessage('LSU ' + str(user) + ' ' + str(password))
 		
 		reply = reply.split()
@@ -476,6 +498,8 @@ class clientUDP(UDPClient.UDPClient):
 		
 		if not isinstance(dir, str):
 			raise IOError("DLB ERR")
+		
+		print("   DLB of " + dir + " from " + bs['IPBS'] + " " + bs['portBS'])
 		
 		reply = self.sendMessage('DLB ' + str(user) + ' ' + str(dir))
 		
@@ -525,10 +549,9 @@ def sigterm_handler(_signo, _stack_frame):
 		serverErrorHandle(pids)
 		print("\nThanks for using this CS")
 	
-	sys.exit(0)
-		
+	os._exit(0)
+
 if __name__ == "__main__":
-		
 	# for Ctrl+c command
 	signal.signal(signal.SIGINT, sigterm_handler)
 	# for kill command
@@ -544,9 +567,13 @@ if __name__ == "__main__":
 			PORT = int(sys.argv[index])
 	
 	print("CS is running at " + str(HOST) + ":" + str(PORT))
-	
-	setStuffToFile("backupServers", [])
-	setStuffToFile("CSUsers", {})
+
+	backupServers = Path("backupServers")
+	if not backupServers.is_file():
+		setStuffToFile("backupServers", [])
+	users = Path("CSUsers")
+	if not users.is_file():
+		setStuffToFile("CSUsers", {})
 	
 	pids = []
 	pids.append(os.getpid())
@@ -555,12 +582,11 @@ if __name__ == "__main__":
 		#this will be the child process
 		try:
 			server_UDP = serverUDP(HOST, PORT)
-			server_UDP.registerBS(["127.0.0.1", "7000"])
 			while True:
 				server_UDP.run()
 		except IOError as error:
 			print(error)
-		except Exception:
+		except Exception as e:
 			print("Something went wrong. Please restart the Central Server")
 			
 	elif pidUDPServer != -1:
@@ -573,7 +599,7 @@ if __name__ == "__main__":
 			server_TCP.run()
 		except IOError as error:
 			print(error)
-		except Exception as msg:
+		except Exception:
 			print("Something went wrong. Please restart the Central Server")
 			
 	else:

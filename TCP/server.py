@@ -28,17 +28,21 @@ class TCPServer(metaclass=ABCMeta):
 			pidChild = os.fork()
 			if pidChild == 0:
 				self.newConnection(conn, addr)
-				sys.exit(0)
+				os._exit(0)
 			elif pidChild == -1:
 				# will try again
 				pidChild = os.fork()
 				if pidChild == 0:
 					self.newConnection(conn, addr)
-					sys.exit(0)
+					os._exit(0)
 	
 	@abstractmethod
 	def interpretMessage(self, message):
 		pass
+	
+	def sigalrm_handler(_signo, _stack_frame):
+		if self.addr:
+			self.sendReply(str.encode("ERR"), self.addr)
 	
 	def sendReply(self, conn, reply):
 		reply += b'\n'
@@ -71,7 +75,7 @@ class TCPServer(metaclass=ABCMeta):
 			
 			# if data has \n, it means that is necessary interpret the message
 			if b'\n' in data:
-				print('From', addr, 'is', receivedMessage)
+				#print('From', addr, 'is', receivedMessage)
 				receivedMessage = receivedMessage.decode('UTF-8')
 				# to verify if data received ends with \n
 				dataArray = receivedMessage.split("\n")
@@ -97,14 +101,13 @@ class TCPServer(metaclass=ABCMeta):
 				
 				try:
 					reply = self.sendReply(conn, reply)
-					print('Sent to', addr, "is", reply)
+					#print('Sent to', addr, "is", reply)
 					if reply == str.encode("ERR"):
 						break
 				except:
 					print("Cannot reach " + str(addr))
 					break
 				
-				receivedMessage = b''				
+				receivedMessage = b''
 		
 		conn.close()
-		sys.exit(0)
