@@ -5,7 +5,7 @@ import os
 import re
 import signal
 import socket
-import pickle
+import pickle, traceback
 from random import randint
 from pathlib import Path
 
@@ -109,7 +109,7 @@ class serverTCP(TCPServer.TCPServer):
 		if isUser and correctPassword:
 			self.currentUser = user
 			self.currentPassword = password
-			print("User: " + str(user))
+			print("Login user: " + str(user))
 			return "AUR OK"
 		elif isUser:
 			return "AUR NOK"
@@ -203,6 +203,7 @@ class serverTCP(TCPServer.TCPServer):
 			client_UDP = clientUDP(bs)
 			try:
 				reply = client_UDP.registerUserToBS(self.currentUser, self.currentPassword)
+				print(reply)
 				if reply == 'OK':
 					users[self.currentUser]['dirs'][dir] = {'BS': bs}
 					setStuffToFile("CSUsers", users)
@@ -229,9 +230,9 @@ class serverTCP(TCPServer.TCPServer):
 		stringToReturn = "BKR " + str(users[self.currentUser]['dirs'][dir]['BS']['IPBS']) + " " + str(users[self.currentUser]['dirs'][dir]['BS']['portBS']) + " " + str(len(filesToUpload))
 		for file in filesToUpload:
 			stringToReturn += " " + str(file['filename']) + " " + str(file['date_time']) + " " + str(file['size'])
+		print(strToReturn)
 		
 		return stringToReturn
-		
 		
 	def listDirBackedUp(self, args):		
 		if not self.existsUser(self.currentUser):
@@ -480,7 +481,7 @@ class clientUDP(UDPClient.UDPClient):
 		if not isinstance(password, str):
 			raise IOError("LSU ERR")
 		
-		print("   LSU " + str(self.currentUser) + " to " + bs['IPBS'] + " " + bs['portBS'])
+		print("   LSU " + str(user) + " to " + str(self.UDP_IP) + " " + str(self.UDP_PORT))
 		
 		reply = self.sendMessage('LSU ' + str(user) + ' ' + str(password))
 		

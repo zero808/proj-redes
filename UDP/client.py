@@ -26,17 +26,19 @@ class UDPClient(metaclass=ABCMeta):
 		
 		receivedMessage = b""
 		while True:
-			# receive (part of) message from the socket
-			try:
-				i = 0
-				while i < 3:
+			# receive (part of) message from the socket			
+			i = 0
+			while i < 3:
+				try:
 					data, addr = self.s.recvfrom(self.BUFFER_SIZE)
+				except socket.timeout:
 					i += 1
-				if i == 3:
-					raise IOError("Cannot receive the answer to the message " + str(message))
-			except Exception as msg:
-				print(str(msg))
-				os._exit(1)
+				except Exception:
+					print("Cannot receive the answer")					
+					os._exit(1)
+			if i == 3:
+				print("Cannot receive the answer")
+
 			receivedMessage += data
 			
 			# if data has \n, it means that is necessary interpret the message
