@@ -201,6 +201,24 @@ def processCSReply(message, fileContents):
     result.append(b'\n')
     return b''.join(result)
 
+# restore
+def restoreDirCSrequest(dirname):
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.connect(CS)
+            if loginAux(s) == LOGIN_SUCCESS:
+                ret = call(s, makeProtocolString("RST", dirname))
+                if EOF in ret:
+                    print("Error: Could not restore the directory {}".format(dirname))
+                elif ERROR in ret:
+                    print("Malformed request")
+                else:
+                    return ret.decode().split(" ")[1:]
+            else:
+                print("Error: Could not login")
+    except ConnectionRefusedError:
+        print("Error in connecting to socket on port: ", CS[1])
+
 def stringifyDirlistCS(filesContent):
     result = []
     for item in filesContent.items():
@@ -350,7 +368,9 @@ def backup(args):
 
 def restore(args):
     "Restores the directory dir"
-    pass
+    dirname = args[1]
+    ret = restoreDirCSrequest(dirname)
+    print(ret[0], ret[1])
 
 def dirlist(args):
     "Lists all the directories"
