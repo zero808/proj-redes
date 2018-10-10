@@ -14,15 +14,16 @@ import AuxiliaryFunctions
 
 bsName = socket.gethostbyname(socket.gethostname())
 bsUDPPort = 9997
+
 parentPid = os.getpid() #parent process id
 
-userList = {} 
+userList = {86415:'password'} 
 
 # SIGNAL HANDLERS
 
 # Process kill
 def handleProcessKill(sig, frame):
-     if os.getpid() == parentPid:
+    if os.getpid() == parentPid:
         endConnection()
         sys.exit(1)
     else:
@@ -148,10 +149,32 @@ def waitForUserMessage():
 
 # Sends the list of files in dirName to the CS
 def sendFileList(dirName):
-    with os.scandir(dirName) as it:
-        for entry in it:
-            if not entry.name.startswith('.') and entry.is_file(): 
-                print(entry.name)
+    try:
+        fileListString = ''
+        nFiles = 0
+        with os.scandir(dirName) as it:
+            for entry in it:
+                if not entry.name.startswith('.') and entry.is_file(): 
+                    nFiles += 1
+
+                    fileListString = fileListString + ' ' + str(entry.name) + ' '
+
+                    fileStats = os.stat(dirName+'/'+entry.name)
+
+                    fileSeconds = fileStats.st_mtime
+                    fileDateTime = AuxiliaryFunctions.stringTime(fileSeconds)
+                    fileListString += fileDateTime
+
+                    fileSize = fileStats.st_size
+                    fileListString = fileListString + str(fileSize)
+
+        fullFileString = 'LFD ' + str(nFiles) + fileListString + '\n'
+        encodedFileString = AuxiliaryFunctions.encode(fullFileString)
+    except ValueError:
+        print('syntax error')
+    except OSError as e:
+        print(e)
+        sys.exit(1)
 
 # Deletes a directory from an user
 def deleteDirectory(dirData):
@@ -216,7 +239,7 @@ def handleListFilesRequest(dirData):
 
         if len(dirData) != 2:
             print('syntax error')
-        elif userName not in userList or (userName in userList and userList.get(userName) != userPassword):
+        elif userName not in userList:
             # if the user doesn't exist or the password is wrong
             print('user error')
         else:
@@ -297,6 +320,8 @@ def main(argv):
     global allRequests
     global pidUDPserver
     global udpserver, tcpserver
+
+    print(bsName)
 
     allRequests = {
         'RGR': handleRegistryResponse,

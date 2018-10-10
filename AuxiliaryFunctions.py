@@ -2,6 +2,7 @@
 import socket
 import sys
 import datetime
+import time
 
 code = 'iso-8859-1'
 
@@ -22,4 +23,8 @@ def timeEpoch(timeString):
     timeNumbers = timeString.split(':')
     timestamp = float(timeNumbers[2]) + float(timeNumbers[1])*60 + float(timeNumbers[0])*3600
     return timestamp 
+
+def stringTime(epoch):
+    timeString = time.strftime('%d-%m-%Y %H:%M:%S ', time.localtime(epoch))
+    return timeString
 
