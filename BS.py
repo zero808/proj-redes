@@ -51,7 +51,48 @@ def handleKeyboardInterruption(sig, frame):
 def endConnection():
     tcpserver.closeConnection()
 
-# receives the files from the user
+# Sends the dirName files to the user
+def restoreDir(dirName):
+    try:
+        fileListString = b''
+        auxiliaryString = ''
+        encodedAuxiliaryString = b''
+        nFiles = 0
+        with os.scandir(dirName) as it:
+            for entry in it:
+                if not entry.name.startswith('.') and entry.is_file():
+                    nFiles += 1
+                    auxiliaryString = auxiliaryString + ' ' + str(entry.name) + ' '
+                    
+                    fileStats = os.stat(dirName+'/'+entry.name)
+
+                    fileSeconds = fileStats.st_mtime
+                    fileDateTime = AuxiliaryFunctions.stringTime(fileSeconds)
+                    auxiliaryString += fileDateTime
+
+                    fileSize = fileStats.st_size
+                    auxiliaryString = auxiliaryString + str(fileSize) + ' '
+
+                    encodedAuxiliaryString = AuxiliaryFunctions.encode(auxiliaryString)
+
+                    with open(str(entry.name), "rb") as binary_file:
+                        # Read the whole file at once
+                        data = binary_file.read()
+                        encodedAuxiliaryString += data
+                    
+                    fileListString += encodedAuxiliaryString
+                    auxiliaryString = ''
+                    encodedAuxiliaryString = b''
+
+        fileListString = AuxiliaryFunctions.encode('RBR ' + str(nFiles) + ' ') + fileListString
+        tcpserver.sendMessage(fileListString)
+                    
+    except OSError as e:
+        fullResponse = AuxiliaryFunctions.encode('RBR ERR\n')
+        tcpserver.sendMessage(fullResponse)
+        sys.exit(1) 
+    
+# Receives the files from the user
 def uploadFile(fileData):
     try:
         directoryName = str(fileData[0])
@@ -74,9 +115,9 @@ def uploadFile(fileData):
                 fileTime = AuxiliaryFunctions.timeEpoch(fileTimeString)
                 
                 fileSize = int(fileData[argCount + 3])
-                data = fileData[argCount + 4]
+                data = AuxiliaryFunctions.encode(fileData[argCount + 4])
                 
-                backupFile = open(fileName, 'w')
+                backupFile = open(fileName, 'wb') # gonna write bytes
                 backupFile.write(data)
                 
                 os.utime(fileName, (fileDate + fileTime, fileDate + fileTime))
@@ -93,7 +134,7 @@ def uploadFile(fileData):
         print('Error handling files or directories', e)
         sys.exit(1)
 
-# user authentication
+# User authentication
 def authenticateUser(userData):
     try:
         userName = int(userData[0])
@@ -110,6 +151,21 @@ def authenticateUser(userData):
     except ValueError:
         # if the userName isn't an int
         handleUserAuthentication('NOK')
+
+# Handles the restore Directory request
+def handleRestoreDirRequest(directory): 
+    try:
+        dirName = str(directory[0])
+
+        if len(directory) != 2:
+            fullResponse = AuxiliaryFunctions.encode('RBR ERR\n')
+            tcpserver.sendMessage(fullResponse)
+        else:
+            # calls the function responsible for sending the dirName files to the user
+            restoreDir(dirName)
+    except ValueError:
+        fullResponse = AuxiliaryFunctions.encode('RBR ERR\n')
+        tcpserver.sendMessage(fullResponse)
 
 # Confirmation of the file backup
 def handleFileBackup(status):
@@ -170,6 +226,7 @@ def sendFileList(dirName):
 
         fullFileString = 'LFD ' + str(nFiles) + fileListString + '\n'
         encodedFileString = AuxiliaryFunctions.encode(fullFileString)
+        udpserver.sendMessage(csName, encodedFileString, csPort)
     except ValueError:
         print('syntax error')
     except OSError as e:
@@ -222,7 +279,7 @@ def deregister():
     # writes the request message
     fullRequest = AuxiliaryFunctions.encode('UNR' + ' ' + bsName + ' ' + str(bsTCPPort) + '\n')
     udpserver.sendMessage(csName, fullRequest, csPort)
-    waitForCSMessage()
+    #waitForCSMessage()
     udpserver.closeConnection() 
 
 # Handles the registry of the new BS 
@@ -330,7 +387,8 @@ def main(argv):
         'AUT': authenticateUser,
         'UPL': uploadFile,
         'DLB': deleteDirectory,
-        'LSF': handleListFilesRequest
+        'LSF': handleListFilesRequest,
+        'RSB': handleRestoreDirRequest
     }
 
     bsTCPPort, csName, csPort = getArguments(argv)
@@ -357,8 +415,6 @@ def main(argv):
         
         while True:
             waitForUserMessage()
-
-
 
 
 if __name__ == "__main__":

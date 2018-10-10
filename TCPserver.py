@@ -32,7 +32,7 @@ class TCPServer:
             fullMessage = b''
             while True: # messages will end with \n
                 fullMessage += data
-                if b'\n' in data:
+                if data.endswith(b'\n'):
                     break
 
                 data = self.connection.recv(BUFFER_SIZE)
