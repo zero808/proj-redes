@@ -51,7 +51,7 @@ class UDPServer(metaclass=ABCMeta):
 			
 			# if data has \n, it means that is necessary interpret the message
 			if b'\n' in data:
-				#print('From', addr, 'is', receivedMessage[str_addr])
+				print('From', addr, 'is', receivedMessage[str_addr])
 				receivedMessage[str_addr] = receivedMessage[str_addr].decode('UTF-8')
 				# to verify if data received ends with \n
 				dataArray = receivedMessage[str_addr].split("\n")
@@ -73,7 +73,7 @@ class UDPServer(metaclass=ABCMeta):
 				
 				try:
 					reply = self.sendReply(reply, addr)
-					#print('Sent to', addr, "is", reply)
+					print('Sent to', addr, "is", reply)
 					if reply == str.encode("ERR"):
 						break
 				except:

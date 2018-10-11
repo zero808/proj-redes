@@ -75,7 +75,7 @@ class TCPServer(metaclass=ABCMeta):
 			
 			# if data has \n, it means that is necessary interpret the message
 			if b'\n' in data:
-				#print('From', addr, 'is', receivedMessage)
+				print('From', addr, 'is', receivedMessage)
 				receivedMessage = receivedMessage.decode('UTF-8')
 				# to verify if data received ends with \n
 				dataArray = receivedMessage.split("\n")
@@ -101,7 +101,7 @@ class TCPServer(metaclass=ABCMeta):
 				
 				try:
 					reply = self.sendReply(conn, reply)
-					#print('Sent to', addr, "is", reply)
+					print('Sent to', addr, "is", reply)
 					if reply == str.encode("ERR"):
 						break
 				except:

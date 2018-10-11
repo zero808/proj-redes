@@ -21,7 +21,7 @@ class UDPClient(metaclass=ABCMeta):
 	def sendMessage(self, message):
 		message = str.encode(message)
 		message += b'\n'
-		#print('Sent to', (self.UDP_IP, self.UDP_PORT), "is", message)
+		print('Sent to', (self.UDP_IP, self.UDP_PORT), "is", message)
 		self.s.sendto(message, (self.UDP_IP, self.UDP_PORT))
 		
 		receivedMessage = b""
@@ -31,6 +31,7 @@ class UDPClient(metaclass=ABCMeta):
 			while i < 3:
 				try:
 					data, addr = self.s.recvfrom(self.BUFFER_SIZE)
+					i = 4
 				except socket.timeout:
 					i += 1
 				except Exception:
@@ -43,7 +44,7 @@ class UDPClient(metaclass=ABCMeta):
 			
 			# if data has \n, it means that is necessary interpret the message
 			if b'\n' in data:
-				#print('From', addr, 'is', receivedMessage)
+				print('From', addr, 'is', receivedMessage)
 				
 				receivedMessage = receivedMessage.decode('UTF-8')
 				# to verify if data received ends with \n

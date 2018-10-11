@@ -203,7 +203,6 @@ class serverTCP(TCPServer.TCPServer):
 			client_UDP = clientUDP(bs)
 			try:
 				reply = client_UDP.registerUserToBS(self.currentUser, self.currentPassword)
-				print(reply)
 				if reply == 'OK':
 					users[self.currentUser]['dirs'][dir] = {'BS': bs}
 					setStuffToFile("CSUsers", users)
@@ -230,7 +229,7 @@ class serverTCP(TCPServer.TCPServer):
 		stringToReturn = "BKR " + str(users[self.currentUser]['dirs'][dir]['BS']['IPBS']) + " " + str(users[self.currentUser]['dirs'][dir]['BS']['portBS']) + " " + str(len(filesToUpload))
 		for file in filesToUpload:
 			stringToReturn += " " + str(file['filename']) + " " + str(file['date_time']) + " " + str(file['size'])
-		print(strToReturn)
+		print(stringToReturn)
 		
 		return stringToReturn
 		
@@ -305,7 +304,7 @@ class serverTCP(TCPServer.TCPServer):
 		if bs not in backupServers:
 			raise IOError("RSR EOF")
 		
-		print("   RST of " + args[0] + " from " + bs['IPBS'] + " " + bs['portBS'])
+		print("   RST of " + args[0] + " from " + bs['IPBS'] + " " + str(bs['portBS']))
 		
 		return "RSR " + bs['IPBS'] + " " + str(bs['portBS'])
 	
@@ -327,7 +326,7 @@ class serverTCP(TCPServer.TCPServer):
 		if bs not in backupServers:
 			raise IOError("DDR NOK")
 		
-		print("   DEL " + dir + " from " + bs['IPBS'] + " " + bs['portBS'])
+		print("   DEL " + dir + " from " + bs['IPBS'] + " " + str(bs['portBS']))
 		
 		client_UDP = clientUDP(bs)
 		try:
@@ -568,13 +567,17 @@ if __name__ == "__main__":
 			PORT = int(sys.argv[index])
 	
 	print("CS is running at " + str(HOST) + ":" + str(PORT))
-
+	
+	'''
 	backupServers = Path("backupServers")
 	if not backupServers.is_file():
 		setStuffToFile("backupServers", [])
 	users = Path("CSUsers")
 	if not users.is_file():
 		setStuffToFile("CSUsers", {})
+	'''
+	setStuffToFile("backupServers", [])
+	setStuffToFile("CSUsers", {})
 	
 	pids = []
 	pids.append(os.getpid())
