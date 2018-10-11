@@ -23,7 +23,9 @@ class UDPServer:
 
     def receiveMessage(self):
         try:
+            print('vai receber mensagem')
             data, clientAddress = self.sock.recvfrom(BUFFER_SIZE)
+            print('recebeu a mensagem:', data, 'de:', clientAddress)
             return (data, clientAddress)
         except socket.error as e:
             print('error on recv: ', e)
@@ -31,7 +33,9 @@ class UDPServer:
 
     def sendMessage(self, clientAddress, message, clientPort):
         try:
+            print('a enviar para: ', clientAddress, clientPort)
             self.sock.sendto(message, (clientAddress, clientPort))
+            print('enviado:', message)
         except socket.error as e:
             print('error on sendto: ', e)
             sys.exit(1)

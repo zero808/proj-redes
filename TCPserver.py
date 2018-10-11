@@ -34,7 +34,7 @@ class TCPServer:
             while True: # messages will end with \n
                 self.fullMessage += data
                 if data.endswith(b'\n'): # tries again to check if there's more to it
-                    self.connection.settimeout(2)
+                    self.connection.settimeout(1)
                     data = self.connection.recv(BUFFER_SIZE)
                     self.fullMessage += data
 

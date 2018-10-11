@@ -17,7 +17,7 @@ bsUDPPort = 9997
 
 parentPid = os.getpid() #parent process id
 
-userList = {86415:'password'} 
+userList = {} 
 
 # SIGNAL HANDLERS
 
@@ -33,7 +33,7 @@ def handleProcessKill(sig, frame):
 # Ctrl + c - deregisters the bs and closes the connections
 def handleKeyboardInterruption(sig, frame):
     if os.getpid() == parentPid:
-        endConnection()
+        #endConnection()
         sys.exit(1)
     else:
         deregister()
@@ -87,14 +87,13 @@ def restoreDir(dirName):
 
         fileListString = AuxiliaryFunctions.encode('RBR ' + str(nFiles)) + fileListString + AuxiliaryFunctions.encode('\n')
         tcpserver.sendMessage(fileListString)
-        print('enviou mensagem')
-        endConnection()
-        newConnection()
+        #endConnection() 
+        #newConnection()
                     
     except OSError as e:
         fullResponse = AuxiliaryFunctions.encode('RBR ERR\n')
         tcpserver.sendMessage(fullResponse)
-        endConnection()
+        #endConnection()
         sys.exit(1) 
     
 # Receives the files from the user
@@ -177,8 +176,8 @@ def handleRestoreDirRequest(directory):
 def handleFileBackup(status):
     fullResponse = AuxiliaryFunctions.encode('UPR ' + status + '\n')
     tcpserver.sendMessage(fullResponse)
-    endConnection()
-    newConnection()
+    #endConnection()
+    #newConnection()
 
 # Confirmation of the user authentication
 def handleUserAuthentication(status):
@@ -203,7 +202,7 @@ def waitForUserMessage():
     if func == None:
         handleUnexpectedTCPProtocolMessage()
     else:
-        return func(confirmation[1:])
+        func(confirmation[1:])
 
 
 
@@ -213,8 +212,10 @@ def waitForUserMessage():
 ##################
 
 # Sends the list of files in dirName to the CS
-def sendFileList(dirName):
+def sendFileList(dirName, csAddress):
     try:
+        newCSname = str(csAddress[0])
+        newCSport = int(csAddress[1])
         fileListString = ''
         nFiles = 0
         with os.scandir(dirName) as it:
@@ -235,7 +236,7 @@ def sendFileList(dirName):
 
         fullFileString = 'LFD ' + str(nFiles) + fileListString + '\n'
         encodedFileString = AuxiliaryFunctions.encode(fullFileString)
-        udpserver.sendMessage(csName, encodedFileString, csPort)
+        udpserver.sendMessage(newCSName, fullResponse, newCSport)
     except ValueError:
         print('syntax error')
     except OSError as e:
@@ -243,41 +244,42 @@ def sendFileList(dirName):
         sys.exit(1)
 
 # Deletes a directory from an user
-def deleteDirectory(dirData):
+def deleteDirectory(dirData, csAddress):
     try:
         userName = int(dirData[0])
         dirName = str(dirData[1])
 
         if len(dirData) != 2:
-            handleDirDeletion('NOK')
+            handleDirDeletion('NOK', csAddress)
         elif userName not in userList:
-            handleDirDeletion('NOK')
+            handleDirDeletion('NOK', csAddress)
         else:
             shutil.rmtree(dirName)
-            handleDirDeletion('OK')
+            handleDirDeletion('OK', csAddress)
 
     except ValueError:
-        handleDirDeletion('NOK')
+        handleDirDeletion('NOK', csAddress)
     except OSError as e:
-        handleDirDeletion('NOK')
+        handleDirDeletion('NOK', csAddress)
         sys.exit(1)
 
 # Adds a new user to the userList
-def registerUser(userData):
+def registerUser(userData, csAddress):
     try:
+        print('entrou no register user')
         userName = int(userData[0])
         userPassword = str(userData[1])
-
         if len(userData) != 2:
             # syntax error
-            handleUserRegistry('ERR')
+            handleUserRegistry('ERR', csAddress)
         elif userName in userList and userList.get(userName) == userPassword:
             # if the userList was not updated
-            handleUserRegistry('NOK')
+            handleUserRegistry('NOK', csAddress)
         else:
+            print('vai criar um user novo:', userName, userPassword)
             userList[userName] = userPassword
             # if userList was updated correctly
-            handleUserRegistry('OK')
+            handleUserRegistry('OK', csAddress)
             print('New user: ', userName)
 
     except ValueError:
@@ -285,20 +287,27 @@ def registerUser(userData):
 
 # Handles the deregistry of the BS
 def deregister():
+    print('entrou do deregister')
     # writes the request message
     fullRequest = AuxiliaryFunctions.encode('UNR' + ' ' + bsName + ' ' + str(bsTCPPort) + '\n')
     udpserver.sendMessage(csName, fullRequest, csPort)
-    #waitForCSMessage()
+    print('mensagem enviada')
+    waitForCSMessage()
+    print('recebeu confirmação')
     udpserver.closeConnection() 
+    print('ligação terminada')
 
 # Handles the registry of the new BS 
 def register():
+    print('entrou no register')
     # writes the request message
     fullRequest = AuxiliaryFunctions.encode('REG' + ' ' + bsName + ' ' + str(bsTCPPort) + '\n')
     udpserver.sendMessage(csName, fullRequest, csPort)
+    print('mensagem enviada:')
+    print(fullRequest)
 
 # Handles the CS request to list the files in a dir
-def handleListFilesRequest(dirData):
+def handleListFilesRequest(dirData, csAddress):
     try:
         userName = int(dirData[0])
         dirName = str(dirData[1])
@@ -310,19 +319,23 @@ def handleListFilesRequest(dirData):
             print('user error')
         else:
             # calls the function responsible for sending the file list
-            sendFileList(dirName)
+            sendFileList(dirName, csAddress)
         
     except ValueError:
         print('syntax error')
 
 # Confirmation of the user directory deletion
-def handleDirDeletion(status):
+def handleDirDeletion(status, csAddress):
+    newCSname = str(csAddress[0])
+    newCSport = int(csAddress[1])
     fullResponse = AuxiliaryFunctions.encode('DBR ' + status + '\n')
-    udpserver.sendMessage(csName, fullResponse, csPort)
+    udpserver.sendMessage(newCSName, fullResponse, newCSport)
     #udpserver.sendMessage('192.168.1.65', fullResponse, 9995)
 
 # Handles the registry response from the CS
-def handleRegistryResponse(confirmation):
+def handleRegistryResponse(confirmation, csAddress):
+    print('entrou no handleRegistryResponse')
+    print('confirmation:', confirmation)
     if confirmation[0] == 'OK':
         print('registry successfull')
     elif confirmation[0] == 'NOK':
@@ -331,7 +344,7 @@ def handleRegistryResponse(confirmation):
         print('syntax error')
 
 # Handles the deregistry response from the CS
-def handleDeregistryResponse(confirmation):
+def handleDeregistryResponse(confirmation, csAddress):
     if confirmation[0] == 'OK':
         print('deregistry successfull')
     elif confirmation[0] == 'NOK':
@@ -340,29 +353,36 @@ def handleDeregistryResponse(confirmation):
         print('syntax error')
 
 # Confirmation of the user registration
-def handleUserRegistry(status):
+def handleUserRegistry(status, csAddress):
+    print('entrou no handleUserRegistry:', status, csAddress)
+    newCSname = str(csAddress[0])
+    newCSport = int(csAddress[1])
+    print(newCSname, newCSport)
     fullResponse = AuxiliaryFunctions.encode('LUR ' + status + '\n')
-    udpserver.sendMessage(csName, fullResponse, csPort)    
+    print(fullResponse)
+    udpserver.sendMessage(newCSname, fullResponse, newCSport)    
+    print('enviou a mensagem ao CS')
 
 # Handles unexpected UDP protocol messages
 def handleUnexpectedUDPProtocolMessage():
+    print('entrou no handleUnexpectedUDPProtocol')
     fullResponse = AuxiliaryFunctions.encode('ERR\n')
     udpserver.sendMessage(csName, fullResponse, csPort)
 
 # Receives the CS requests and responses
 def waitForCSMessage():
-
+    print('waiting for message')
     # waits for a request
     message, address = udpserver.receiveMessage()
     confirmation = AuxiliaryFunctions.decode(message).split()
 
     func = allRequests.get(confirmation[0])
-    print(func)
-
     if func == None:
         handleUnexpectedUDPProtocolMessage()
     else:
-        return func(confirmation[1:])
+        print('vai entrar na função:')
+        print(func)
+        func(confirmation[1:], address)
 
 
 
@@ -379,15 +399,14 @@ def getArguments(argv):
     csName = d['n']
     csPort = d['p']
 
+    print(csName, csPort)
     return (int(bsTCPPort), csName, int(csPort))
 
 def main(argv):
-    global bsTCPPort, csName, csPort
+    global bsTCPPort, csName, csPort, newCSname, newCSport
     global allRequests
     global pidUDPserver
     global udpserver, tcpserver
-
-    print(bsName)
 
     allRequests = {
         'RGR': handleRegistryResponse,
@@ -401,6 +420,9 @@ def main(argv):
     }
 
     bsTCPPort, csName, csPort = getArguments(argv)
+    newCSname = csName
+    newCSport = csPort
+    bsUDPPort = bsTCPPort
 
     try: 
         pidUDPserver = os.fork()
