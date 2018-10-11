@@ -218,6 +218,103 @@ def restoreDirCSrequest(dirname):
                 print("Error: Could not login")
     except ConnectionRefusedError:
         print("Error in connecting to socket on port: ", CS[1])
+        
+def restoreDirBSrequest(dirname):
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.connect(BS)
+            if loginAux(s) == LOGIN_SUCCESS:
+                st = makeProtocolString("RSB", dirname)
+                ret = downloadFiles(s, st)
+                if EOF in ret:
+                    print("Error: Could not restore the directory {}".format(dirname))
+                elif ERROR in ret:
+                    print("Malformed request")
+                else:
+                    return ret.decode().split(" ")[1:]
+            else:
+                print("Error: Could not login")
+    except ConnectionRefusedError:
+        print("Error in connecting to socket on port: ", CS[1])
+        
+def downloadFiles(socket, message):
+    buffer_size = 4096
+    chunks = []
+    ret = NOK  
+    
+    #Send our request (after converting it to bytes)
+    if isinstance(message, str):
+        payload = message.encode()
+    else:
+        payload = message
+    
+    socket.sendall(payload)
+    
+    try:
+        while True:
+            data = socket.recv(buffer_size)
+            #the server closed the connection, i.e., there is
+            #no more data to be received
+            if data == b'':
+                break
+            chunks.append(data)
+    
+            # we got the final '\n' so this was the last message
+            #if data.endswith(b'\n'):
+            #    break
+    except ConnectionResetError as err:
+        print('TCP error: {0}'.format(err))
+    #        print("erro")
+    
+        ret = b''.join(chunks)#.strip()
+
+        if not ret.endswith(b'\n'):
+            print("Error downloading files")
+            ret = None
+        elif EOF in ret or ERROR in ret:
+            print("Error")
+            ret = None
+        else:
+            print(ret)
+
+        #we can't use strip as it might remove whitespace that belongs to the file
+        return ret#[:len(ret) - 1]
+    
+def createFiles(dirname, message):
+    import os
+    import fileinput
+    import datetime    
+    from re import findall as f
+    
+    separator= b'\s'
+    filename = b'\\w*\\.\\w*'
+    #filecount = b'\d*'
+    datetime = b'\d{2}\.\d{2}\.\d{4}\s\d{2}\:\d{2}\:\d{2}'
+    size = b'\d*'
+    data = b'.*?\s'
+    arr = [filename, datetime, size, data]
+    reg = separator.join(arr)
+    payload = "a.txt 20.01.2018 12:12:12 14 asdkadakdaas b.txt 20.01.2018 12:12:12 15 asadada"
+    N = f(b'RBR \d*')
+    N = int(N[0].split(b' ')[1])
+    
+    if N > 0:
+        try:
+            tokens = f(reg, message)
+            #create the folder if it doesn't exist
+            if not os.path.isdir(dirname):
+                os.mkdir(dirname)
+            os.chdir(dirname)            
+            
+            for fi in tokens:
+                if len(fi) >= 4:
+                    with open(fi[0], 'wb') as fp:
+                        fp.write(fp[4])
+            
+            os.chdir(os.pardir)
+        except:
+            print('Error creating directory and files')
+# ########
 
 def stringifyDirlistCS(filesContent):
     result = []
@@ -370,7 +467,13 @@ def restore(args):
     "Restores the directory dir"
     dirname = args[1]
     ret = restoreDirCSrequest(dirname)
-    print(ret[0], ret[1])
+    if ret is None:
+        return
+    
+    global BS
+    BS = (ret[0], int(ret[1]))
+    ret = restoreDirBSrequest(dirname)
+    createFiles(dirname, ret)
 
 def dirlist(args):
     "Lists all the directories"
@@ -382,7 +485,7 @@ def dirlist(args):
                 if ERROR in ret:
                     print("Malformed request")
                 else:
-                   handleDirlist(ret)
+                    handleDirlist(ret)
             else:
                 print("Error: wrong credentials")
     except ConnectionRefusedError:
@@ -405,7 +508,7 @@ def filelist(args):
                 elif ret == b'LFD NOK':
                     print("Filelist request cannot be served")
                 else:
-                   handleFilelist(ret, dire)
+                    handleFilelist(ret, dire)
             else:
                 print("Error: wrong credentials")
     except ConnectionRefusedError:
