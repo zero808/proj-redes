@@ -172,6 +172,8 @@ def processCSReply(message, fileContents):
     mandatory = separator.join([ip, filecount])
 
     results = f(mandatory, message_str)
+    if not len(results) > 0:
+        return
     tokens = results[0].split(' ')
     
     global BS
@@ -226,7 +228,9 @@ def restoreDirBSrequest(dirname):
             if loginAux(s) == LOGIN_SUCCESS:
                 st = makeProtocolString("RSB", dirname)
                 ret = downloadFiles(s, st)
-                if EOF in ret:
+                if ret is None:
+                    return
+                elif EOF in ret:
                     print("Error: Could not restore the directory {}".format(dirname))
                 elif ERROR in ret:
                     print("Malformed request")
