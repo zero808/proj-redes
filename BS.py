@@ -51,6 +51,10 @@ def handleKeyboardInterruption(sig, frame):
 def endConnection():
     tcpserver.closeConnection()
 
+def newConnection():
+    tcpserver = TCPserver.TCPServer(bsName, bsTCPPort)
+    tcpserver.establishConnection()
+
 # Sends the dirName files to the user
 def restoreDir(dirName):
     try:
@@ -63,19 +67,16 @@ def restoreDir(dirName):
                 if not entry.name.startswith('.') and entry.is_file():
                     nFiles += 1
                     auxiliaryString = auxiliaryString + ' ' + str(entry.name) + ' '
-                    
                     fileStats = os.stat(dirName+'/'+entry.name)
 
                     fileSeconds = fileStats.st_mtime
                     fileDateTime = AuxiliaryFunctions.stringTime(fileSeconds)
                     auxiliaryString += fileDateTime
-
                     fileSize = fileStats.st_size
                     auxiliaryString = auxiliaryString + str(fileSize) + ' '
-
                     encodedAuxiliaryString = AuxiliaryFunctions.encode(auxiliaryString)
 
-                    with open(str(entry.name), "rb") as binary_file:
+                    with open(str(dirName + '/' + entry.name), "rb") as binary_file:
                         # Read the whole file at once
                         data = binary_file.read()
                         encodedAuxiliaryString += data
@@ -84,12 +85,16 @@ def restoreDir(dirName):
                     auxiliaryString = ''
                     encodedAuxiliaryString = b''
 
-        fileListString = AuxiliaryFunctions.encode('RBR ' + str(nFiles) + ' ') + fileListString
+        fileListString = AuxiliaryFunctions.encode('RBR ' + str(nFiles)) + fileListString + AuxiliaryFunctions.encode('\n')
         tcpserver.sendMessage(fileListString)
+        print('enviou mensagem')
+        endConnection()
+        newConnection()
                     
     except OSError as e:
         fullResponse = AuxiliaryFunctions.encode('RBR ERR\n')
         tcpserver.sendMessage(fullResponse)
+        endConnection()
         sys.exit(1) 
     
 # Receives the files from the user
@@ -156,8 +161,8 @@ def authenticateUser(userData):
 def handleRestoreDirRequest(directory): 
     try:
         dirName = str(directory[0])
-
-        if len(directory) != 2:
+        print(dirName)
+        if len(directory) != 1:
             fullResponse = AuxiliaryFunctions.encode('RBR ERR\n')
             tcpserver.sendMessage(fullResponse)
         else:
@@ -166,15 +171,19 @@ def handleRestoreDirRequest(directory):
     except ValueError:
         fullResponse = AuxiliaryFunctions.encode('RBR ERR\n')
         tcpserver.sendMessage(fullResponse)
+        print('Value Error')
 
 # Confirmation of the file backup
 def handleFileBackup(status):
     fullResponse = AuxiliaryFunctions.encode('UPR ' + status + '\n')
     tcpserver.sendMessage(fullResponse)
+    endConnection()
+    newConnection()
 
 # Confirmation of the user authentication
 def handleUserAuthentication(status):
     fullResponse = AuxiliaryFunctions.encode('AUR ' + status + '\n')
+    print('vai enviar mensagem')
     tcpserver.sendMessage(fullResponse)
 
 # Handles unexpected TCP protocol messages

@@ -3,7 +3,7 @@ import socket
 import sys
 import AuxiliaryFunctions
 
-BUFFER_SIZE = 4096
+BUFFER_SIZE = 1024
 
 class TCPServer:
     def __init__(self, HOST, PORT):
@@ -13,6 +13,7 @@ class TCPServer:
             self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             self.sock.bind((HOST,PORT)) 
+            self.fullMessage = b''
         except socket.error as e:
             print('error creating socket:', e)
             sys.exit(1)
@@ -29,19 +30,20 @@ class TCPServer:
             
             data = self.connection.recv(BUFFER_SIZE)
 
-            fullMessage = b''
+            self.fullMessage = b''
             while True: # messages will end with \n
-                fullMessage += data
-                if data.endswith(b'\n'):
-                    break
+                self.fullMessage += data
+                if data.endswith(b'\n'): # tries again to check if there's more to it
+                    self.connection.settimeout(2)
+                    data = self.connection.recv(BUFFER_SIZE)
+                    self.fullMessage += data
 
                 data = self.connection.recv(BUFFER_SIZE)
 
-            return fullMessage
+            return self.fullMessage
 
-        except socket.error as e:
-            print('error on recv:', e)
-            sys.exit(1)
+        except socket.timeout:
+            return self.fullMessage
 
     def sendMessage(self, data):    
         try:                  
