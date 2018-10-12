@@ -136,6 +136,7 @@ def backupBSRequest(dirname, N, dirBytes):
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect(BS)
+            s.settimeout(20)
             if loginAux(s) == LOGIN_SUCCESS:
                 
                 t = b' '.join([b'UPL', dirname.encode(), bytes(str(N), 'utf-8'), dirBytes])
@@ -153,7 +154,7 @@ def backupBSRequest(dirname, N, dirBytes):
             #    print("Malformed request")
             else:
                 print("Error: Could not backup the directory {}".format(dirname))
-    except ConnectionRefusedError:
+    except (ConnectionRefusedError, socket.timeout):
         print("Error in connecting to socket on port: ", CS[1])
 
 def processCSReply(message, fileContents):
@@ -208,38 +209,44 @@ def restoreDirCSrequest(dirname):
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect(CS)
+            s.settimeout(20)
             if loginAux(s) == LOGIN_SUCCESS:
                 ret = call(s, makeProtocolString("RST", dirname))
                 if EOF in ret:
                     print("Error: Could not restore the directory {}".format(dirname))
+                    return None
                 elif ERROR in ret:
                     print("Malformed request")
+                    return None
                 else:
                     return ret.decode().split(" ")[1:]
             else:
                 print("Error: Could not login")
-    except ConnectionRefusedError:
+    except (ConnectionRefusedError, socket.timeout):
         print("Error in connecting to socket on port: ", CS[1])
         
 def restoreDirBSrequest(dirname):
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect(BS)
+            s.settimeout(20)
             if loginAux(s) == LOGIN_SUCCESS:
                 st = makeProtocolString("RSB", dirname)
                 ret = downloadFiles(s, st)
                 if ret is None:
-                    return
+                    return None
                 elif EOF in ret:
                     print("Error: Could not restore the directory {}".format(dirname))
+                    return None
                 elif ERROR in ret:
                     print("Malformed request")
+                    return None
                 else:
-                    return ret.decode().split(" ")[1:]
+                    return ret#.decode("ISO-8859-1").split(" ")[1:]
             else:
                 print("Error: Could not login")
-    except ConnectionRefusedError:
-        print("Error in connecting to socket on port: ", CS[1])
+    except (ConnectionRefusedError, socket.timeout):
+        print("Error in connecting to socket on port: ", BS[1])
         
 def downloadFiles(socket, message):
     buffer_size = 4096
@@ -270,19 +277,19 @@ def downloadFiles(socket, message):
         print('TCP error: {0}'.format(err))
     #        print("erro")
     
-        ret = b''.join(chunks)#.strip()
+    ret = b''.join(chunks)#.strip()
 
-        if not ret.endswith(b'\n'):
-            print("Error downloading files")
-            ret = None
-        elif EOF in ret or ERROR in ret:
-            print("Error")
-            ret = None
-        else:
-            print(ret)
+    if not ret.endswith(b'\n'):
+        print("Error downloading files")
+        ret = None
+    elif EOF in ret or ERROR in ret:
+        print("Error")
+        ret = None
+    else:
+        print(ret)
 
         #we can't use strip as it might remove whitespace that belongs to the file
-        return ret#[:len(ret) - 1]
+    return ret#[:len(ret) - 1]
     
 def createFiles(dirname, message):
     import os
@@ -296,13 +303,14 @@ def createFiles(dirname, message):
     datetime = b'\d{2}\.\d{2}\.\d{4}\s\d{2}\:\d{2}\:\d{2}'
     size = b'\d*'
     data = b'.*?\s'
-    arr = [filename, datetime, size, data]
+    arr = [filename, datetime, size]
     reg = separator.join(arr)
-    payload = "a.txt 20.01.2018 12:12:12 14 asdkadakdaas b.txt 20.01.2018 12:12:12 15 asadada"
-    N = f(b'RBR \d*')
+    payload = b"a.txt 20.01.2018 12:12:12 14 asdkadakdaas b.txt 20.01.2018 12:12:12 15 asadada"
+    indices = []
+    N = f(b'RBR \d*', message)
     N = int(N[0].split(b' ')[1])
-    
-    if N > 0:
+
+    if N > 0 and len(message) > 0:
         try:
             tokens = f(reg, message)
             #create the folder if it doesn't exist
@@ -311,9 +319,22 @@ def createFiles(dirname, message):
             os.chdir(dirname)            
             
             for fi in tokens:
-                if len(fi) >= 4:
-                    with open(fi[0], 'wb') as fp:
-                        fp.write(fp[4])
+                #calculate the position of the file contents in the message string
+                indices.append(message.find(fi))
+            
+            for ix, tk in enumerate(indices):
+                if ix < len(indices) - 1:
+                    #get the substring between the start of the token and it's length
+                    filecontent = message[tk + len(tokens[ix]):indices[ix+1]-1]
+                else:
+                    #if it's the last one just get the substring till the end
+                    filecontent = message[tk + len(tokens[ix]) + 1:]
+                    #remove the last \n
+                    filecontent = filecontent[:len(filecontent)-1]
+                
+                #save the file
+                with open(tokens[ix].split(b' ')[0], 'wb') as fp:
+                    fp.write(filecontent)
             
             os.chdir(os.pardir)
         except:
@@ -416,6 +437,7 @@ def login(args):
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect(CS)
+            s.settimeout(20)
             #perform service call
             status = loginAux(s)
 
@@ -430,7 +452,7 @@ def login(args):
                 logout(None)
                 print("Malformed request")
             return status
-    except ConnectionRefusedError:
+    except (ConnectionRefusedError, socket.timeout):
         print("Error in connecting to socket on port: ", CS[1])
 
 def deluser(args):
@@ -438,6 +460,7 @@ def deluser(args):
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect(CS)
+            s.settimeout(20)
             if loginAux(s) == LOGIN_SUCCESS:
                 ret = call(s, makeProtocolString("DLU"))
                 if ret == b"DLR OK":
@@ -448,7 +471,7 @@ def deluser(args):
                     print("Malformed request")
             else:
                 print("Error: Could not delete the current user")
-    except ConnectionRefusedError:
+    except (ConnectionRefusedError, socket.timeout):
         print("Error in connecting to socket on port: ", CS[1])
 
 def backup(args):
@@ -477,6 +500,8 @@ def restore(args):
     global BS
     BS = (ret[0], int(ret[1]))
     ret = restoreDirBSrequest(dirname)
+    if ret is None:
+        return
     createFiles(dirname, ret)
 
 def dirlist(args):
@@ -484,6 +509,7 @@ def dirlist(args):
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect(CS)
+            s.settimeout(20)
             if loginAux(s) == LOGIN_SUCCESS:
                 ret = call(s, makeProtocolString("LSD"))
                 if ERROR in ret:
@@ -492,7 +518,7 @@ def dirlist(args):
                     handleDirlist(ret)
             else:
                 print("Error: wrong credentials")
-    except ConnectionRefusedError:
+    except (ConnectionRefusedError, socket.timeout):
         print("Error in connecting to socket on port: ", CS[1])
 
 def filelist(args):
@@ -505,6 +531,7 @@ def filelist(args):
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect(CS)
+            s.settimeout(20)
             if loginAux(s) == LOGIN_SUCCESS:
                 ret = call(s, makeProtocolString("LSF", dire))
                 if ERROR in ret:
@@ -515,7 +542,7 @@ def filelist(args):
                     handleFilelist(ret, dire)
             else:
                 print("Error: wrong credentials")
-    except ConnectionRefusedError:
+    except (ConnectionRefusedError, socket.timeout):
         print("Error in connecting to socket on port: ", CS[1])
 
 def delete(args):
@@ -528,6 +555,7 @@ def delete(args):
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect(CS)
+            s.settimeout(20)
             if loginAux(s) == LOGIN_SUCCESS:
                 ret = call(s, makeProtocolString("DEL", dire))
                 if ERROR in ret:
@@ -538,7 +566,7 @@ def delete(args):
                     print("Successfully deleted directory {}".format(dire))
             else:
                 print("Error: wrong credentials")
-    except ConnectionRefusedError:
+    except (ConnectionRefusedError, socket.timeout):
         print("Error in connecting to socket on port: ", CS[1])
 
 def logout(args):
