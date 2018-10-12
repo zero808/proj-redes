@@ -18,7 +18,6 @@ bsUDPPort = 9997
 
 parentPid = os.getpid() #parent process id
 
-userList = {} 
 
 # SIGNAL HANDLERS
 
@@ -102,8 +101,8 @@ def uploadFile(fileData):
     print('esta na função upload file')
     try:
         print(fileData)
-        directoryName = str(fileData[0])
-        numberOfFiles = int(fileData[1])
+        directoryName = str(AuxiliaryFunctions.decode(fileData[0]))
+        numberOfFiles = int(AuxiliaryFunctions.decode(fileData[1]))
         print('dir name:', directoryName, 'number of files:', numberOfFiles)
         print(len(fileData))
         print(numberOfFiles * 5 + 2)
@@ -118,16 +117,17 @@ def uploadFile(fileData):
             print(directoryName,':', end=' ')
             argCount = 2
             for i in range(0, numberOfFiles):
-                fileName = str(fileData[argCount])
+                fileName = str(AuxiliaryFunctions.decode(fileData[argCount]))
 
-                fileDateString = str(fileData[argCount + 1])
+                fileDateString = str(AuxiliaryFunctions.decode(fileData[argCount + 1]))
                 fileDate = AuxiliaryFunctions.dateEpoch(fileDateString)
                 
-                fileTimeString = str(fileData[argCount + 2])
+                fileTimeString = str(AuxiliaryFunctions.decode(fileData[argCount + 2]))
                 fileTime = AuxiliaryFunctions.timeEpoch(fileTimeString)
                 
-                fileSize = int(fileData[argCount + 3])
-                data = AuxiliaryFunctions.encode(fileData[argCount + 4])
+                fileSize = int(AuxiliaryFunctions.decode(fileData[argCount + 3]))
+                #data = AuxiliaryFunctions.encode(fileData[argCount + 4])
+                data = bytes(fileData[argCount + 4])
                 
                 backupFile = open(fileName, 'wb') # gonna write bytes
                 backupFile.write(data)
@@ -225,9 +225,12 @@ def waitForUserMessage():
     # waits for a request/response
     message = tcpserver.receiveMessage()
     print(message)
-    confirmation = AuxiliaryFunctions.decode(message).split(' ')
-
-    func = allRequests.get(confirmation[0])
+    if message[:3] == b'UPL':
+        confirmation = message.split(b' ')
+        func = allRequests.get(AuxiliaryFunctions.decode(confirmation[0]))
+    else:
+        confirmation = AuxiliaryFunctions.decode(message).split(' ')
+        func = allRequests.get(confirmation[0])
 
     if func == None:
         handleUnexpectedTCPProtocolMessage()

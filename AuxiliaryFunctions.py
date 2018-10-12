@@ -12,6 +12,11 @@ def encode(data):
     return data.encode(code)
 
 def decode(data):
+    print(data[:3])
+    # file data will not be decoded 
+    dataToDecode = ''
+    if data[:3] == b'UPL':
+
     return data.decode()
 
 def dateEpoch(dateString):
