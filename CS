@@ -213,7 +213,7 @@ class serverTCP(TCPServer.TCPServer):
 			bs = users[self.currentUser]['dirs'][dir]['BS']
 			client_UDP = clientUDP(bs)
 			try:
-				receivedMessage = client_UDP.listFiles(self.currentUser, self.currentPassword)
+				receivedMessage = client_UDP.listFiles(self.currentUser, dir)
 			except IOError:
 				raise IOError("BKR EOF")
 			
@@ -572,12 +572,12 @@ if __name__ == "__main__":
 	backupServers = Path("backupServers")
 	if not backupServers.is_file():
 		setStuffToFile("backupServers", [])
+	'''
 	users = Path("CSUsers")
 	if not users.is_file():
 		setStuffToFile("CSUsers", {})
-	'''
+	
 	setStuffToFile("backupServers", [])
-	setStuffToFile("CSUsers", {})
 	
 	pids = []
 	pids.append(os.getpid())
