@@ -25,6 +25,6 @@ def timeEpoch(timeString):
     return timestamp 
 
 def stringTime(epoch):
-    timeString = time.strftime('%d-%m-%Y %H:%M:%S ', time.localtime(epoch))
+    timeString = time.strftime('%d.%m.%Y %H:%M:%S ', time.localtime(epoch))
     return timeString
 

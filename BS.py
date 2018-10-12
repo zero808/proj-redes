@@ -6,6 +6,7 @@ import os
 import shutil
 import datetime
 import signal
+from multiprocessing import Process, Value, Array
 import UDPserver
 import TCPserver
 import AuxiliaryFunctions
@@ -98,14 +99,21 @@ def restoreDir(dirName):
     
 # Receives the files from the user
 def uploadFile(fileData):
+    print('esta na função upload file')
     try:
+        print(fileData)
         directoryName = str(fileData[0])
         numberOfFiles = int(fileData[1])
-
+        print('dir name:', directoryName, 'number of files:', numberOfFiles)
+        print(len(fileData))
+        print(numberOfFiles * 5 + 2)
+        print(numberOfFiles)
         if len(fileData) != (numberOfFiles * 5 + 2):
+            print('len errado')
             handleFileBackup('NOK')
         
         else:
+            print('está no else')
             os.mkdir(directoryName)
             print(directoryName,':', end=' ')
             argCount = 2
@@ -141,20 +149,42 @@ def uploadFile(fileData):
 # User authentication
 def authenticateUser(userData):
     try:
-        userName = int(userData[0])
-        userPassword = userData[1]
+        userName = str(userData[0])
+        userPassword = str(userData[1])
         if len(userData) != 2:
+            print('len error')
             handleUserAuthentication('NOK')
-        elif userName not in userList or (userName in userList and userList.get(userName) != userPassword):
-            # if the user doesn't exist or the password is wrong
-            handleUserAuthentication('NOK')
+            
         else:
-            # valid authentication
-            handleUserAuthentication('OK')
+            print('esta no else')
+            authentic = False
+            userFile = open('BSusers', 'r')  
+            print('abriu o ficheiro')
+            user = userFile.readline()
+            print('leu a linha')
+            while user:
+                currentUserData = user.split(" ")
+                if currentUserData[0] == userName:
+                    print([currentUserData[1]])
+                    print([userPassword.rstrip('\n')])
+                    if currentUserData[1] == userPassword.rstrip('\n'):
+                        print('a comparar passwords:', currentUserData[1], userPassword)
+                        authentic = True
+                        print('é autentico')
+                        handleUserAuthentication('OK')
+                user = userFile.readline()
+            userFile.close()
+                
+            if not authentic:
+                print('não é autentico')
+                handleUserAuthentication('NOK')
 
     except ValueError:
         # if the userName isn't an int
         handleUserAuthentication('NOK')
+    except OSError as e:
+        print('Error handling the user list:',e)
+        sys.exit(1)
 
 # Handles the restore Directory request
 def handleRestoreDirRequest(directory): 
@@ -176,11 +206,10 @@ def handleRestoreDirRequest(directory):
 def handleFileBackup(status):
     fullResponse = AuxiliaryFunctions.encode('UPR ' + status + '\n')
     tcpserver.sendMessage(fullResponse)
-    #endConnection()
-    #newConnection()
 
 # Confirmation of the user authentication
 def handleUserAuthentication(status):
+    print('status:',status)
     fullResponse = AuxiliaryFunctions.encode('AUR ' + status + '\n')
     print('vai enviar mensagem')
     tcpserver.sendMessage(fullResponse)
@@ -192,16 +221,18 @@ def handleUnexpectedTCPProtocolMessage():
 
 # Receives the user requests and responses
 def waitForUserMessage():
-
+    print('waiting for TCP message')
     # waits for a request/response
     message = tcpserver.receiveMessage()
-    confirmation = AuxiliaryFunctions.decode(message).split()
+    print(message)
+    confirmation = AuxiliaryFunctions.decode(message).split(' ')
 
     func = allRequests.get(confirmation[0])
 
     if func == None:
         handleUnexpectedTCPProtocolMessage()
     else:
+        print('gonna call:', func)
         func(confirmation[1:])
 
 
@@ -213,12 +244,15 @@ def waitForUserMessage():
 
 # Sends the list of files in dirName to the CS
 def sendFileList(dirName, csAddress):
+    print('entrou na função sendFileList')
     try:
         newCSname = str(csAddress[0])
         newCSport = int(csAddress[1])
+        print(newCSname, newCSport)
         fileListString = ''
         nFiles = 0
         with os.scandir(dirName) as it:
+            print('entrou no dir')
             for entry in it:
                 if not entry.name.startswith('.') and entry.is_file(): 
                     nFiles += 1
@@ -235,8 +269,9 @@ def sendFileList(dirName, csAddress):
                     fileListString = fileListString + str(fileSize)
 
         fullFileString = 'LFD ' + str(nFiles) + fileListString + '\n'
+        print(fullFileString)
         encodedFileString = AuxiliaryFunctions.encode(fullFileString)
-        udpserver.sendMessage(newCSName, fullResponse, newCSport)
+        udpserver.sendMessage(newCSname, encodedFileString, newCSport)
     except ValueError:
         print('syntax error')
     except OSError as e:
@@ -246,16 +281,40 @@ def sendFileList(dirName, csAddress):
 # Deletes a directory from an user
 def deleteDirectory(dirData, csAddress):
     try:
-        userName = int(dirData[0])
+        userName = str(dirData[0])
         dirName = str(dirData[1])
 
         if len(dirData) != 2:
             handleDirDeletion('NOK', csAddress)
-        elif userName not in userList:
-            handleDirDeletion('NOK', csAddress)
         else:
-            shutil.rmtree(dirName)
-            handleDirDeletion('OK', csAddress)
+            # if the user doesn't exist
+            exists = False
+            userFile = open('BSusers', 'w')  
+            user = userFile.readline()
+            while user:
+                currentUserData = user.split()
+                if currentUserData[0] == userName:
+                    exists = True
+                    currentDirN = currentUserData[2]
+                    updatedDirN = int(currentUserData[2] - 1)
+                    shutil.rmtree(dirName) # deletes the dir
+                    userFile.write(str(userName) + ' ' + userPassword + ' ' + str(updatedDirN) + '\n') # updates the number of dirs of each user
+
+                user = userFile.readline()
+            userFile.close()
+
+            if not exists:
+                handleDirDeletion('NOK', csAddress)
+            else:
+                # now it's going to check for users with 0 dir
+                userFile = open('BSusers', 'w')
+                users = userFile.readlines()
+                for line in users:
+                    data = line.split()
+                    dirN = int(data[2])
+                    if dirN != 0:
+                        userFile.write(line) # only writes the users with directories
+                handleDirDeletion('OK', csAddress)
 
     except ValueError:
         handleDirDeletion('NOK', csAddress)
@@ -266,63 +325,81 @@ def deleteDirectory(dirData, csAddress):
 # Adds a new user to the userList
 def registerUser(userData, csAddress):
     try:
-        print('entrou no register user')
         userName = int(userData[0])
         userPassword = str(userData[1])
         if len(userData) != 2:
             # syntax error
             handleUserRegistry('ERR', csAddress)
-        elif userName in userList and userList.get(userName) == userPassword:
-            # if the userList was not updated
-            handleUserRegistry('NOK', csAddress)
         else:
-            print('vai criar um user novo:', userName, userPassword)
-            userList[userName] = userPassword
-            # if userList was updated correctly
-            handleUserRegistry('OK', csAddress)
-            print('New user: ', userName)
+            # checks if the user already exists
+            exists = False
+            userFile = open('BSusers', 'a+')  
+            user = userFile.readline()
+            while user:
+                currentUserData = user.split()
+                if currentUserData[0] == userName:
+                    exists = True
+                    handleUserRegistry('NOK', csAddress)
+                user = userFile.readline()
+            
+            if not exists:
+                userFile.write(str(userName) + ' ' + userPassword + ' 1\n')       
+                handleUserRegistry('OK', csAddress)
+                print('New user: ' + str(userName) + '\n')
+            
+            userFile.close()
 
     except ValueError:
         handleUserRegistry('ERR')
+    except OSError as e:
+        print('error handling the user list:',e)
+        sys.exit(1)
 
 # Handles the deregistry of the BS
 def deregister():
-    print('entrou do deregister')
     # writes the request message
     fullRequest = AuxiliaryFunctions.encode('UNR' + ' ' + bsName + ' ' + str(bsTCPPort) + '\n')
     udpserver.sendMessage(csName, fullRequest, csPort)
-    print('mensagem enviada')
     waitForCSMessage()
-    print('recebeu confirmação')
     udpserver.closeConnection() 
-    print('ligação terminada')
 
 # Handles the registry of the new BS 
 def register():
-    print('entrou no register')
     # writes the request message
     fullRequest = AuxiliaryFunctions.encode('REG' + ' ' + bsName + ' ' + str(bsTCPPort) + '\n')
     udpserver.sendMessage(csName, fullRequest, csPort)
-    print('mensagem enviada:')
-    print(fullRequest)
 
 # Handles the CS request to list the files in a dir
 def handleListFilesRequest(dirData, csAddress):
+    print('entrou na função handleListFilesRequest')
     try:
-        userName = int(dirData[0])
+        userName = str(dirData[0])
         dirName = str(dirData[1])
 
         if len(dirData) != 2:
             print('syntax error')
-        elif userName not in userList:
-            # if the user doesn't exist or the password is wrong
-            print('user error')
         else:
-            # calls the function responsible for sending the file list
-            sendFileList(dirName, csAddress)
+            # if the user doesn't exist
+            exists = False
+            userFile = open('BSusers', 'r')  
+            user = userFile.readline()
+            while user:
+                currentUserData = user.split()
+                if currentUserData[0] == userName:
+                    exists = True
+                user = userFile.readline()
+                
+            if exists:
+                print('existe, vai entrar em sendFileList')
+                sendFileList(dirName, csAddress)
+            else:
+                print('User not in user list')
         
     except ValueError:
         print('syntax error')
+    except OSError as e:
+        print('Error handling the user list:',e)
+        sys.exit(1)
 
 # Confirmation of the user directory deletion
 def handleDirDeletion(status, csAddress):
@@ -334,49 +411,42 @@ def handleDirDeletion(status, csAddress):
 
 # Handles the registry response from the CS
 def handleRegistryResponse(confirmation, csAddress):
-    print('entrou no handleRegistryResponse')
-    print('confirmation:', confirmation)
     if confirmation[0] == 'OK':
-        print('registry successfull')
+        print('BS now registered in the CS')
     elif confirmation[0] == 'NOK':
-        print('registry not successfull')
+        print('Registry not successfull')
     else:
         print('syntax error')
 
 # Handles the deregistry response from the CS
 def handleDeregistryResponse(confirmation, csAddress):
     if confirmation[0] == 'OK':
-        print('deregistry successfull')
+        print('Unregistry successfull')
     elif confirmation[0] == 'NOK':
-        print('deregistry not successfull')
+        print('Unregistry not successfull')
     else:
         print('syntax error')
 
 # Confirmation of the user registration
 def handleUserRegistry(status, csAddress):
-    print('entrou no handleUserRegistry:', status, csAddress)
     newCSname = str(csAddress[0])
     newCSport = int(csAddress[1])
-    print(newCSname, newCSport)
     fullResponse = AuxiliaryFunctions.encode('LUR ' + status + '\n')
-    print(fullResponse)
     udpserver.sendMessage(newCSname, fullResponse, newCSport)    
-    print('enviou a mensagem ao CS')
 
 # Handles unexpected UDP protocol messages
 def handleUnexpectedUDPProtocolMessage():
-    print('entrou no handleUnexpectedUDPProtocol')
     fullResponse = AuxiliaryFunctions.encode('ERR\n')
     udpserver.sendMessage(csName, fullResponse, csPort)
 
 # Receives the CS requests and responses
 def waitForCSMessage():
-    print('waiting for message')
     # waits for a request
     message, address = udpserver.receiveMessage()
     confirmation = AuxiliaryFunctions.decode(message).split()
-
+    print(confirmation[0])
     func = allRequests.get(confirmation[0])
+    print(func)
     if func == None:
         handleUnexpectedUDPProtocolMessage()
     else:

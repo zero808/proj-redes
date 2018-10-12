@@ -23,9 +23,7 @@ class UDPServer:
 
     def receiveMessage(self):
         try:
-            print('vai receber mensagem')
             data, clientAddress = self.sock.recvfrom(BUFFER_SIZE)
-            print('recebeu a mensagem:', data, 'de:', clientAddress)
             return (data, clientAddress)
         except socket.error as e:
             print('error on recv: ', e)
@@ -33,9 +31,7 @@ class UDPServer:
 
     def sendMessage(self, clientAddress, message, clientPort):
         try:
-            print('a enviar para: ', clientAddress, clientPort)
             self.sock.sendto(message, (clientAddress, clientPort))
-            print('enviado:', message)
         except socket.error as e:
             print('error on sendto: ', e)
             sys.exit(1)
@@ -43,33 +39,3 @@ class UDPServer:
     def closeConnection(self):
         self.sock.close()
 
-
-
-# Global Variables
-
-HOST = 'localhost'
-PORT = 9999
-BUFFER_SIZE = 4096
-
-if __name__ == "__main__":
-    server = UDPServer(HOST, PORT)
-
-    data, clientAddress = server.receiveMessage()
-    print(data)
-
-    server.sendMessage(clientAddress[0], AuxiliaryFunctions.encode('RGR OK'), clientAddress[1])
-
-    server.sendMessage(clientAddress[0], AuxiliaryFunctions.encode('TFEW 86415 password'), clientAddress[1])
-    print('mensagem enviada')
-    data, clientAddress = server.receiveMessage()
-    print(data)
-#
- #   server.sendMessage(clientAddress[0], AuxiliaryFunctions.encode('LSU ist86416 eMPOL98'), clientAddress[1])
-  #  print('mensagem enviada')
-    data, clientAddress = server.receiveMessage()
-    print(data)
-#
- #   #data, clientAddress = server.receiveMessage()
-  #  #print(data)
-    server.sendMessage(clientAddress[0], AuxiliaryFunctions.encode('UAR OK'), clientAddress[1])
-    server.closeConnection()

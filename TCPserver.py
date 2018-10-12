@@ -59,27 +59,3 @@ class TCPServer:
         except socket.error as e:
             print('error on close:', e)
             sys.exit(1)
-
-
-# Global Variables
-#
-#HOST = 'localhost'
-#PORT = 9999
-#BUFFER_SIZE = 4096
-
-#if __name__ == "__main__":
-
-
-#s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-#s.bind((HOST,PORT))
-#s.listen() # not specified, default value is 5
-#connection, clientAddress = s.accept() # returns new connection and the client address
-#print('Connected by ', clientAddress)
-#while True:
-#    data = connection.recv(BUFFER_SIZE)
-#    if not data: break
-#    #if data.endswith(b'\n'): messages will end with \n
-    #    break
-#    connection.sendall(data)
-
-#connection.close()
