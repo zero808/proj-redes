@@ -572,12 +572,12 @@ if __name__ == "__main__":
 	backupServers = Path("backupServers")
 	if not backupServers.is_file():
 		setStuffToFile("backupServers", [])
-	'''
 	users = Path("CSUsers")
 	if not users.is_file():
 		setStuffToFile("CSUsers", {})
-	
+	'''
 	setStuffToFile("backupServers", [])
+	setStuffToFile("CSUsers", {})
 	
 	pids = []
 	pids.append(os.getpid())
