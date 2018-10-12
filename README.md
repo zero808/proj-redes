@@ -1,5 +1,8 @@
 # proj-redes
 Projecto da Cadeira de Redes 2018/2019
+Duarte Barreira - 64752
+Francisco Matos - 
+Gonçalo Costa -
 
 ## How to run
 ```
