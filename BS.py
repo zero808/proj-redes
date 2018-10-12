@@ -284,45 +284,69 @@ def sendFileList(dirName, csAddress):
 
 # Deletes a directory from an user
 def deleteDirectory(dirData, csAddress):
+    print('entrou no deleteDirectory')
     try:
         userName = str(dirData[0])
         dirName = str(dirData[1])
-
+        linearray = []
+        print(userName, dirName)
         if len(dirData) != 2:
+            print('wrong len')
             handleDirDeletion('NOK', csAddress)
         else:
+            print('else')
             # if the user doesn't exist
             exists = False
-            userFile = open('BSusers', 'w')  
+            userFile = open('BSusers', 'r')  
+            print('abriu o ficheiro')
+            print(userFile)
             user = userFile.readline()
+            print(user)
             while user:
+                linearray.append(user)
+                print('while')
                 currentUserData = user.split()
-                if currentUserData[0] == userName:
+                print(currentUserData)
+                if str(currentUserData[0]) == userName:
+                    print('encontrou o user')
                     exists = True
                     currentDirN = currentUserData[2]
-                    updatedDirN = int(currentUserData[2] - 1)
+                    print('n atual de dir:', currentDirN)
+                    updatedDirN = int(currentUserData[2]) - 1
+                    print('novo n de dir:', updatedDirN)
                     shutil.rmtree(dirName) # deletes the dir
-                    userFile.write(str(userName) + ' ' + userPassword + ' ' + str(updatedDirN) + '\n') # updates the number of dirs of each user
+                    print('diretorio removido')
+                    #userFile.write(str(userName) + ' ' + userPassword + ' ' + str(updatedDirN) + '\n') # updates the number of dirs of each user
+                    #print('atualizou o numero')
 
                 user = userFile.readline()
             userFile.close()
 
             if not exists:
+                print('nao existe')
                 handleDirDeletion('NOK', csAddress)
             else:
+                print('user existe e vai verificar se tem 0 dir')
                 # now it's going to check for users with 0 dir
                 userFile = open('BSusers', 'w')
-                users = userFile.readlines()
-                for line in users:
-                    data = line.split()
-                    dirN = int(data[2])
-                    if dirN != 0:
-                        userFile.write(line) # only writes the users with directories
+                for line in linearray:
+                    lineSplit = line.split()
+                    if lineSplit[0] == userName:
+                        if int(lineSplit[2]) == 1:
+                            continue
+                        else:
+                            lineSplit[2] = str(int(lineSplit[2]) - 1)
+                        userFile.write(lineSplit[0] + ' ' + lineSplit[1] + ' ' + lineSplit[2]+ '\n')
+                    else:
+                        userFile.write(line)
+                userFile.close()  
                 handleDirDeletion('OK', csAddress)
 
     except ValueError:
+        print('value error')
         handleDirDeletion('NOK', csAddress)
     except OSError as e:
+        print('os error')
         handleDirDeletion('NOK', csAddress)
         sys.exit(1)
 
