@@ -1,13 +1,13 @@
 # proj-redes
 Projecto da Cadeira de Redes 2018/2019
 
-# How to run
+## How to run
 ```
-$ python3 CS.py -n tejo.tecnico.ulisboa.pt -p 58011
+$ python3 CS.py -p 58004
 ```
 or first make the files executables with:
 ```
-$ chmod +x CS.py
+$ chmod +x CS.py user BS.py
 ```
 and then 
 ```
