@@ -1,7 +1,7 @@
 # proj-redes
 Projecto da Cadeira de Redes 2018/2019
 
-#How to run
+# How to run
 ```
 $ python3 CS.py -n tejo.tecnico.ulisboa.pt -p 58011
 ```
