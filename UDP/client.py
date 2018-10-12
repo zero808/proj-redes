@@ -46,6 +46,7 @@ class UDPClient(metaclass=ABCMeta):
 			if b'\n' in data:
 				print('From', addr, 'is', receivedMessage)
 				
+				print(b"received: " + receivedMessage)
 				receivedMessage = receivedMessage.decode('UTF-8')
 				# to verify if data received ends with \n
 				dataArray = receivedMessage.split("\n")

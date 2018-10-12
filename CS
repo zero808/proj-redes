@@ -309,35 +309,40 @@ class serverTCP(TCPServer.TCPServer):
 		return "RSR " + bs['IPBS'] + " " + str(bs['portBS'])
 	
 	def deleteDir(self, args):
-		if not self.existsUser(self.currentUser):
-			raise IOError("ERR")
-		
-		if len(args) != 1 and not isinstance(args[0], str):
-			raise IOError("DDR NOK")
-		
-		users = getStuffFromFile("CSUsers")
-		backupServers = getStuffFromFile("backupServers")
-		
-		if args[0] not in users[self.currentUser]['dirs']:
-			return "DDR NOK"
-		
-		bs = users[self.currentUser]['dirs'][args[0]]['BS']
-		
-		if bs not in backupServers:
-			raise IOError("DDR NOK")
-		
-		print("   DEL " + dir + " from " + bs['IPBS'] + " " + str(bs['portBS']))
-		
-		client_UDP = clientUDP(bs)
 		try:
-			reply = client_UDP.deleteDir(self.currentUser, args[0])
-			if reply == "OK":
-				del users[self.currentUser]['dirs'][args[0]]
-				setStuffToFile("CSUsers", users)
+			if not self.existsUser(self.currentUser):
+				raise IOError("ERR")
 			
-			return "DDR " + reply
-		except IOError:
-			raise IOError("DDR NOK")
+			if len(args) != 1 and not isinstance(args[0], str):
+				raise IOError("DDR NOK")
+			
+			users = getStuffFromFile("CSUsers")
+			backupServers = getStuffFromFile("backupServers")
+			
+			if args[0] not in users[self.currentUser]['dirs']:
+				return "DDR NOK"
+			
+			bs = users[self.currentUser]['dirs'][args[0]]['BS']
+			
+			if bs not in backupServers:
+				raise IOError("DDR NOK")
+			
+			print("   DEL " + args[0] + " from " + bs['IPBS'] + " " + str(bs['portBS']))
+			
+			client_UDP = clientUDP(bs)
+			try:
+				reply = client_UDP.deleteDir(self.currentUser, args[0])
+				if reply == "OK":
+					del users[self.currentUser]['dirs'][args[0]]
+					setStuffToFile("CSUsers", users)
+				
+				return "DDR " + reply
+			except IOError:
+				raise IOError("DDR NOK")
+		except Exception as e:
+		    exc_type, exc_obj, exc_tb = sys.exc_info()
+		    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+		    print(exc_type, fname, exc_tb.tb_lineno)
 
 class serverUDP(UDPServer.UDPServer):
 	
@@ -449,15 +454,17 @@ class clientUDP(UDPClient.UDPClient):
 		if not isinstance(dir, str):
 			raise IOError("LFD ERR")
 		
-		reply = self.sendMessage('LSF ' + str(user) + ' ' + dir)			
+		print("chegou aqui")
+		reply = self.sendMessage('LSF ' + str(user) + ' ' + dir)		
+		print("enviou")	
 		reply = reply.split()
 			
 		try:
 			reply[1] = int(reply[1])
 		except ValueError:
 			raise IOError("LFD ERR")
-		
-		print("   LSF " + dir + " from " + bs['IPBS'] + " " + bs['portBS'])
+
+		print("   LSF " + str(dir) + " from " + str(self.UDP_PORT) + " " + str(self.UDP_IP))
 		
 		if reply[0] == 'LFD' and (len(reply) - 2) % 4 == 0 and (len(reply) - 2) / 4 == reply[1]:
 			files = []
@@ -499,7 +506,7 @@ class clientUDP(UDPClient.UDPClient):
 		if not isinstance(dir, str):
 			raise IOError("DLB ERR")
 		
-		print("   DLB of " + dir + " from " + bs['IPBS'] + " " + bs['portBS'])
+		print("   DLB of " + dir + " from " + str(self.UDP_IP) + " " + str(self.UDP_PORT))
 		
 		reply = self.sendMessage('DLB ' + str(user) + ' ' + str(dir))
 		

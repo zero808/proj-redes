@@ -254,22 +254,23 @@ def sendFileList(dirName, csAddress):
         print(newCSname, newCSport)
         fileListString = ''
         nFiles = 0
-        with os.scandir(dirName) as it:
-            print('entrou no dir')
-            for entry in it:
-                if not entry.name.startswith('.') and entry.is_file(): 
-                    nFiles += 1
+        it = os.scandir(dirName)
+        #with os.scandir(dirName) as it:
+        print('entrou no dir')
+        for entry in it:
+            if not entry.name.startswith('.') and entry.is_file(): 
+                nFiles += 1
 
-                    fileListString = fileListString + ' ' + str(entry.name) + ' '
+                fileListString = fileListString + ' ' + str(entry.name) + ' '
 
-                    fileStats = os.stat(dirName+'/'+entry.name)
+                fileStats = os.stat(dirName+'/'+entry.name)
 
-                    fileSeconds = fileStats.st_mtime
-                    fileDateTime = AuxiliaryFunctions.stringTime(fileSeconds)
-                    fileListString += fileDateTime
+                fileSeconds = fileStats.st_mtime
+                fileDateTime = AuxiliaryFunctions.stringTime(fileSeconds)
+                fileListString += fileDateTime
 
-                    fileSize = fileStats.st_size
-                    fileListString = fileListString + str(fileSize)
+                fileSize = fileStats.st_size
+                fileListString = fileListString + str(fileSize)
 
         fullFileString = 'LFD ' + str(nFiles) + fileListString + '\n'
         print(fullFileString)
@@ -409,7 +410,7 @@ def handleDirDeletion(status, csAddress):
     newCSname = str(csAddress[0])
     newCSport = int(csAddress[1])
     fullResponse = AuxiliaryFunctions.encode('DBR ' + status + '\n')
-    udpserver.sendMessage(newCSName, fullResponse, newCSport)
+    udpserver.sendMessage(newCSname, fullResponse, newCSport)
     #udpserver.sendMessage('192.168.1.65', fullResponse, 9995)
 
 # Handles the registry response from the CS
@@ -444,6 +445,7 @@ def handleUnexpectedUDPProtocolMessage():
 
 # Receives the CS requests and responses
 def waitForCSMessage():
+    print('waiting for CS message')
     # waits for a request
     message, address = udpserver.receiveMessage()
     confirmation = AuxiliaryFunctions.decode(message).split()
